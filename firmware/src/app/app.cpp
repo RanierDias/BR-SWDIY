@@ -9,12 +9,27 @@
 #include "types/telemetry_types.h"
 #include "config/config_model.h"
 
+#include "hw/pedals.h"
+
 static DeviceConfig g_config;
 static DeviceStatus g_status;
+
+static void update_pedals()
+{
+  uint16_t throttle_raw = read_throttle_raw();
+  uint16_t brake_raw = read_brake_raw();
+  uint16_t clutch_raw = read_clutch_raw();
+
+  g_status.throttle = static_cast<uint8_t>(map(throttle_raw, 0, 1023, 0, 100));
+  g_status.brake = static_cast<uint8_t>(map(brake_raw, 0, 1023, 0, 100));
+  g_status.clutch = static_cast<uint8_t>(map(clutch_raw, 0, 1023, 0, 100));
+}
 
 void setup_app()
 {
   Serial.begin(brswdiy::protocol::SERIAL_BAUDRATE);
+  setup_pedals();
+
   g_status.state = DeviceState::BOOT;
 
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
@@ -42,6 +57,7 @@ void setup_app()
 
 void update_app()
 {
+  update_pedals();
   process_serial_protocol();
 }
 

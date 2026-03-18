@@ -67,6 +67,12 @@ namespace
       Serial.print(status.output);
       Serial.print(" LIMIT=");
       Serial.print(status.limit);
+      Serial.print(" THROTTLE=");
+      Serial.print(status.throttle);
+      Serial.print(" BRAKE=");
+      Serial.print(status.brake);
+      Serial.print(" CLUTCH=");
+      Serial.print(status.clutch);
       Serial.print(" FAULT=");
       Serial.print(status.fault ? 1 : 0);
       Serial.print(" CALIBRATED=");
