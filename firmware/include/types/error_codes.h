@@ -1,0 +1,15 @@
+#pragma once
+
+enum class ErrorCode {
+  NONE = 0,
+  UNKNOWN_COMMAND = 1,
+  INVALID_ARGUMENT = 2,
+  INVALID_RANGE = 3,
+  INVALID_STATE = 4,
+  MOTOR_DISABLED = 5,
+  NOT_CALIBRATED = 6,
+  EEPROM_ERROR = 7,
+  WATCHDOG_TIMEOUT = 8,
+  FAULT_ACTIVE = 9,
+  NOT_SUPPORTED = 10,
+};
