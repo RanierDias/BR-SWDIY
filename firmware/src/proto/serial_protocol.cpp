@@ -177,7 +177,7 @@ namespace
 
     if (strcmp(raw, "MOTOR_START") == 0)
     {
-      handle_motor_enable(true);
+      handle_motor(true);
 
       Serial.println("OK MOTOR=1");
       return;
@@ -185,7 +185,7 @@ namespace
 
     if (strcmp(raw, "MOTOR_STOP") == 0)
     {
-      handle_motor_enable(false);
+      handle_motor(false);
 
       Serial.println("OK MOTOR=0");
       return;

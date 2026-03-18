@@ -9,11 +9,10 @@ void update_app();
 
 const DeviceConfig &get_config();
 const DeviceStatus &get_status();
-DeviceState get_state();
 
 bool set_gain(int gain);
 bool set_output_limit(int limit);
 bool set_safe_start(bool safe_start);
 bool set_watchdog(int watchdog_ms);
 
-void handle_motor_enable(bool enable);
+void handle_motor(bool enable);

@@ -55,11 +55,6 @@ const DeviceStatus &get_status()
   return g_status;
 }
 
-DeviceState get_state()
-{
-  return g_status.state;
-}
-
 bool set_gain(int gain)
 {
   if (gain < 0 || gain > 100)
@@ -100,7 +95,7 @@ bool set_watchdog(int watchdog_ms)
   return true;
 }
 
-void handle_motor_enable(bool enable)
+void handle_motor(bool enable)
 {
   g_status.motor_enabled = enable;
 }
