@@ -181,6 +181,14 @@ namespace
       return;
     }
 
+    if (strcmp(raw, "RESET_ANGLE") == 0)
+    {
+      reset_angle();
+
+      Serial.println("OK RESET_ANGLE");
+      return;
+    }
+
     if (strcmp(raw, "MOTOR_START") == 0)
     {
       handle_motor(true);

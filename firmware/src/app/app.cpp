@@ -10,6 +10,7 @@
 #include "config/config_model.h"
 
 #include "hw/pedals.h"
+#include "hw/encoder.h"
 
 static DeviceConfig g_config;
 static DeviceStatus g_status;
@@ -25,10 +26,16 @@ static void update_pedals()
   g_status.clutch = static_cast<uint8_t>(map(clutch_raw, 0, 1023, 0, 100));
 }
 
+static void update_encoder()
+{
+  g_status.angle = get_encoder_position();
+}
+
 void setup_app()
 {
   Serial.begin(brswdiy::protocol::SERIAL_BAUDRATE);
   setup_pedals();
+  setup_encoder();
 
   g_status.state = DeviceState::BOOT;
 
@@ -58,6 +65,7 @@ void setup_app()
 void update_app()
 {
   update_pedals();
+  update_encoder();
   process_serial_protocol();
 }
 
@@ -114,4 +122,9 @@ bool set_watchdog(int watchdog_ms)
 void handle_motor(bool enable)
 {
   g_status.motor_enabled = enable;
+}
+
+void reset_angle()
+{
+  reset_encoder_position();
 }
