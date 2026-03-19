@@ -16,4 +16,4 @@ bool set_safe_start(bool safe_start);
 bool set_watchdog(int watchdog_ms);
 
 void handle_motor(bool enable);
-void reset_angle();
+void recenter_encoder();

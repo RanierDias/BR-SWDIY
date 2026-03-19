@@ -181,9 +181,9 @@ namespace
       return;
     }
 
-    if (strcmp(raw, "RESET_ANGLE") == 0)
+    if (strcmp(raw, "RECENTER") == 0)
     {
-      reset_angle();
+      recenter_encoder();
 
       Serial.println("OK RESET_ANGLE");
       return;

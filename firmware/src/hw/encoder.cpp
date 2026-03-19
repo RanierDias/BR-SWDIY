@@ -66,10 +66,3 @@ int16_t get_encoder_position()
     interrupts();
     return position;
 }
-
-void reset_encoder_position()
-{
-    noInterrupts();
-    g_encoder_position = 0;
-    interrupts();
-}

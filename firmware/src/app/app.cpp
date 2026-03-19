@@ -14,6 +14,7 @@
 
 static DeviceConfig g_config;
 static DeviceStatus g_status;
+static int16_t g_encoder_zero_offset;
 
 static void update_pedals()
 {
@@ -28,7 +29,8 @@ static void update_pedals()
 
 static void update_encoder()
 {
-  g_status.angle = get_encoder_position();
+  int16_t raw_position = get_encoder_position();
+  g_status.angle = raw_position - g_encoder_zero_offset;
 }
 
 void setup_app()
@@ -46,6 +48,7 @@ void setup_app()
   g_config.dir_invert = false;
   g_config.encoder_invert = false;
 
+  g_encoder_zero_offset = get_encoder_position();
   g_status.angle = 0;
   g_status.center = 0;
   g_status.output = 0;
@@ -124,7 +127,8 @@ void handle_motor(bool enable)
   g_status.motor_enabled = enable;
 }
 
-void reset_angle()
+void recenter_encoder()
 {
-  reset_encoder_position();
+  g_encoder_zero_offset = get_encoder_position();
+  g_status.angle = 0;
 }
