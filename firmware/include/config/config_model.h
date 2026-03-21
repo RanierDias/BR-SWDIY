@@ -12,6 +12,4 @@ struct DeviceConfig
   uint8_t output_limit = 25;
   bool safe_start = true;
   uint16_t watchdog_ms = 250;
-  bool dir_invert = false;
-  bool encoder_invert = false;
 };
