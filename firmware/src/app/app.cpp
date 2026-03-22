@@ -12,12 +12,14 @@
 
 #include "hw/pedals.h"
 #include "hw/encoder.h"
+#include "hw/motor.h"
 #include "hw/eeprom_store.h"
 
 static DeviceConfig g_config;
 static DeviceStatus g_status;
 static int16_t g_encoder_zero_offset;
 static InputCalibration g_input_calibration;
+static int8_t g_motor_output = 0;
 
 static void apply_default_config()
 {
@@ -115,16 +117,40 @@ static void update_encoder()
   g_status.angle = raw_position - g_encoder_zero_offset;
 }
 
+static void update_motor_output()
+{
+  int8_t output = g_motor_output;
+
+  if (!g_status.motor_enabled)
+  {
+    output = 0;
+  }
+
+  if (output > g_config.output_limit)
+  {
+    output = g_config.output_limit;
+  }
+
+  if (output < -g_config.output_limit)
+  {
+    output = -g_config.output_limit;
+  }
+
+  g_status.output = output;
+  set_motor_output(output);
+}
+
 void setup_app()
 {
   Serial.begin(brswdiy::protocol::SERIAL_BAUDRATE);
   setup_pedals();
   setup_encoder();
+  setup_motor();
 
   g_status.state = DeviceState::BOOT;
   apply_default_config();
-  g_status.config_saved = load_config();
 
+  g_status.config_saved = load_config();
   g_encoder_zero_offset = get_encoder_position();
   g_status.state = DeviceState::READY;
 }
@@ -134,6 +160,7 @@ void update_app()
   update_pedals();
   update_encoder();
   process_serial_protocol();
+  update_motor_output();
 }
 
 const DeviceConfig &get_config()
@@ -330,9 +357,26 @@ bool set_pedal_invert(bool enable)
   return true;
 }
 
+bool set_motor_output_command(int value)
+{
+  if (value < -100 || value > 100)
+  {
+    return false;
+  }
+
+  g_motor_output = value;
+  return true;
+}
+
 bool handle_motor(bool enable)
 {
   g_status.motor_enabled = enable;
+
+  if (!enable)
+  {
+    g_motor_output = 0;
+  }
+
   return true;
 }
 

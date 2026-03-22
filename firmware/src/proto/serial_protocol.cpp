@@ -134,6 +134,23 @@ namespace
       return;
     }
 
+    if (strncmp(raw, "SET_OUTPUT ", 11) == 0)
+    {
+      int value = atoi(raw + 11);
+
+      if (set_motor_output_command(value))
+      {
+        Serial.print(F("OK OUTPUT="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "OUTPUT");
+      }
+
+      return;
+    }
+
     if (strncmp(raw, "SET_OUTPUT_LIMIT ", 17) == 0)
     {
       int value = atoi(raw + 17);
@@ -371,6 +388,7 @@ namespace
     if (strcmp(raw, "MOTOR_STOP") == 0)
     {
       handle_motor(false);
+      set_motor_output_command(0);
 
       Serial.println(F("OK MOTOR=0"));
       return;

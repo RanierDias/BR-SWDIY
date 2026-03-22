@@ -32,3 +32,4 @@ bool set_brake_max(int value);
 bool set_clutch_min(int value);
 bool set_clutch_max(int value);
 bool set_pedal_invert(bool enable);
+bool set_motor_output_command(int value);
