@@ -119,12 +119,12 @@ static void update_encoder()
 
 static void update_motor_output()
 {
-  int8_t output = g_motor_output;
-
   if (!g_status.motor_enabled)
   {
-    output = 0;
+    return;
   }
+
+  int8_t output = g_motor_output;
 
   if (output > g_config.output_limit)
   {
@@ -157,10 +157,10 @@ void setup_app()
 
 void update_app()
 {
-  update_pedals();
   update_encoder();
-  process_serial_protocol();
   update_motor_output();
+  update_pedals();
+  process_serial_protocol();
 }
 
 const DeviceConfig &get_config()
@@ -374,7 +374,8 @@ bool handle_motor(bool enable)
 
   if (!enable)
   {
-    g_motor_output = 0;
+    g_status.output = 0;
+    set_motor_output(0);
   }
 
   return true;
