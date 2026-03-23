@@ -20,10 +20,6 @@ void setup_motor()
     pinMode(MOTOR_RIGHT_PIN, OUTPUT);
     pinMode(MOTOR_ENABLE_PIN, OUTPUT);
 
-    const uint8_t port_motor_left = digitalPinToPort(MOTOR_LEFT_PIN);
-    const uint8_t port_motor_right = digitalPinToPort(MOTOR_RIGHT_PIN);
-    const uint8_t port_motor_enable = digitalPinToPort(MOTOR_ENABLE_PIN);
-
     digitalWrite(MOTOR_ENABLE_PIN, LOW);
 
     analogWrite(MOTOR_LEFT_PIN, 0);

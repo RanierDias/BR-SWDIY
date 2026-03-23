@@ -15,11 +15,21 @@
 #include "hw/motor.h"
 #include "hw/eeprom_store.h"
 
+enum class OutputSource
+{
+  MANUAL,
+  LINK
+};
+
 static DeviceConfig g_config;
 static DeviceStatus g_status;
 static int16_t g_encoder_zero_offset;
 static InputCalibration g_input_calibration;
-static int8_t g_motor_output = 0;
+static uint32_t g_last_link_update_ms = 0;
+static int8_t g_manual_output = 0;
+static int8_t g_link_output = 0;
+
+static constexpr uint16_t LINK_TIMEOUT_MS = 250;
 
 static void apply_default_config()
 {
@@ -117,6 +127,23 @@ static void update_encoder()
   g_status.angle = raw_position - g_encoder_zero_offset;
 }
 
+static int8_t get_requested_output()
+{
+  if (g_status.link)
+  {
+    if ((millis() - g_last_link_update_ms) <= LINK_TIMEOUT_MS)
+    {
+      return g_link_output;
+    }
+
+    int8_t value = 0;
+
+    return value;
+  }
+
+  return g_manual_output;
+}
+
 static void update_motor_output()
 {
   if (!g_status.motor_enabled)
@@ -124,7 +151,7 @@ static void update_motor_output()
     return;
   }
 
-  int8_t output = g_motor_output;
+  int8_t output = get_requested_output();
 
   if (output > g_config.output_limit)
   {
@@ -357,15 +384,37 @@ bool set_pedal_invert(bool enable)
   return true;
 }
 
-bool set_motor_output_command(int value)
+bool set_manual_output(int value)
 {
   if (value < -100 || value > 100)
   {
     return false;
   }
 
-  g_motor_output = value;
+  g_manual_output = value;
   return true;
+}
+
+bool set_link_output(int value)
+{
+  if (value < -100 || value > 100)
+  {
+    return false;
+  }
+
+  g_link_output = value;
+  g_last_link_update_ms = millis();
+  return true;
+}
+
+void use_manual_output()
+{
+  g_status.link = false;
+}
+
+void use_link_output()
+{
+  g_status.link = true;
 }
 
 bool handle_motor(bool enable)

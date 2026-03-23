@@ -10,7 +10,6 @@ void update_app();
 
 const DeviceConfig &get_config();
 const DeviceStatus &get_status();
-
 const InputCalibration &get_pedal_calibration();
 
 bool save_config();
@@ -32,4 +31,8 @@ bool set_brake_max(int value);
 bool set_clutch_min(int value);
 bool set_clutch_max(int value);
 bool set_pedal_invert(bool enable);
-bool set_motor_output_command(int value);
+bool set_manual_output(int value);
+bool set_link_output(int value);
+
+void use_manual_output();
+void use_link_output();

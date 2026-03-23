@@ -47,6 +47,8 @@ namespace
       Serial.print(state_name(status.state));
       Serial.print(F(" MOTOR="));
       Serial.print(status.motor_enabled ? 1 : 0);
+      Serial.print(F(" SOURCE="));
+      Serial.print(status.link ? "LINK" : "MANUAL");
       Serial.print(F(" FAULT="));
       Serial.print(status.fault ? 1 : 0);
       Serial.print(F(" CALIBRATED="));
@@ -138,7 +140,7 @@ namespace
     {
       int value = atoi(raw + 11);
 
-      if (set_motor_output_command(value))
+      if (set_manual_output(value))
       {
         Serial.print(F("OK OUTPUT="));
         Serial.println(value);
@@ -146,6 +148,23 @@ namespace
       else
       {
         write_error(3, "INVALID_RANGE", "OUTPUT");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "SET_OUTPUT_LINK ", 16) == 0)
+    {
+      int value = atoi(raw + 16);
+
+      if (set_link_output(value))
+      {
+        Serial.print(F("OK LINK_OUTPUT="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "LINK_OUTPUT");
       }
 
       return;
@@ -163,6 +182,32 @@ namespace
       else
       {
         write_error(3, "INVALID_RANGE", "OUTPUT_LIMIT");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "SET_MODE ", 9) == 0)
+    {
+      int value = atoi(raw + 9);
+
+      if (value != 0 && value != 1)
+      {
+        write_error(4, "INVALID_STATE", "MODE");
+        return;
+      }
+
+      if (value != 0)
+      {
+        use_link_output();
+
+        Serial.println(F("OK MODE=LINK"));
+      }
+      else
+      {
+        use_manual_output();
+
+        Serial.println(F("OK MODE=MANUAL"));
       }
 
       return;
@@ -388,7 +433,8 @@ namespace
     if (strcmp(raw, "MOTOR_STOP") == 0)
     {
       handle_motor(false);
-      set_motor_output_command(0);
+      set_manual_output(0);
+      set_link_output(0);
 
       Serial.println(F("OK MOTOR=0"));
       return;
