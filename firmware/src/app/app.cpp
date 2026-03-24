@@ -3,7 +3,8 @@
 #include <Arduino.h>
 
 #include "constants/protocol_constants.h"
-#include "proto/serial_protocol.h"
+#include "proto/command_parser.h"
+#include "proto/response_stream.h"
 
 #include "types/device_state.h"
 #include "types/telemetry_types.h"
@@ -15,21 +16,18 @@
 #include "hw/motor.h"
 #include "hw/eeprom_store.h"
 
-enum class OutputSource
-{
-  MANUAL,
-  LINK
-};
-
 static DeviceConfig g_config;
 static DeviceStatus g_status;
 static int16_t g_encoder_zero_offset;
 static InputCalibration g_input_calibration;
-static uint32_t g_last_link_update_ms = 0;
-static int8_t g_manual_output = 0;
-static int8_t g_link_output = 0;
+static uint32_t g_last_output_ms = 0;
+static int8_t g_output = 0;
+static uint32_t g_last_fast_update = 0;
+static uint32_t g_last_slow_update = 0;
 
-static constexpr uint16_t LINK_TIMEOUT_MS = 250;
+static constexpr uint16_t FAST_INTERVAL = 1000;
+static constexpr uint16_t SLOW_INTERVAL = 5000;
+static constexpr uint16_t OUTPUT_TIMEOUT_MS = 250;
 
 static void apply_default_config()
 {
@@ -129,19 +127,12 @@ static void update_encoder()
 
 static int8_t get_requested_output()
 {
-  if (g_status.link)
+  if ((millis() - g_last_output_ms) <= OUTPUT_TIMEOUT_MS)
   {
-    if ((millis() - g_last_link_update_ms) <= LINK_TIMEOUT_MS)
-    {
-      return g_link_output;
-    }
-
-    int8_t value = 0;
-
-    return value;
+    return g_output;
   }
 
-  return g_manual_output;
+  return 0;
 }
 
 static void update_motor_output()
@@ -184,10 +175,24 @@ void setup_app()
 
 void update_app()
 {
-  update_encoder();
-  update_motor_output();
-  update_pedals();
-  process_serial_protocol();
+  const uint32_t now = micros();
+
+  if ((now - g_last_fast_update) >= FAST_INTERVAL)
+  {
+    g_last_fast_update = now;
+
+    process_command_parser();
+    update_motor_output();
+  }
+
+  if ((now - g_last_slow_update) >= SLOW_INTERVAL)
+  {
+    g_last_slow_update = now;
+
+    update_pedals();
+    update_encoder();
+    send_telemetry_frame();
+  }
 }
 
 const DeviceConfig &get_config()
@@ -384,37 +389,16 @@ bool set_pedal_invert(bool enable)
   return true;
 }
 
-bool set_manual_output(int value)
+bool set_output(int value)
 {
   if (value < -100 || value > 100)
   {
     return false;
   }
 
-  g_manual_output = value;
+  g_output = value;
+  g_last_output_ms = millis();
   return true;
-}
-
-bool set_link_output(int value)
-{
-  if (value < -100 || value > 100)
-  {
-    return false;
-  }
-
-  g_link_output = value;
-  g_last_link_update_ms = millis();
-  return true;
-}
-
-void use_manual_output()
-{
-  g_status.link = false;
-}
-
-void use_link_output()
-{
-  g_status.link = true;
 }
 
 bool handle_motor(bool enable)

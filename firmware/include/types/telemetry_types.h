@@ -16,7 +16,6 @@ struct DeviceStatus
     uint8_t buttons = 0;
     bool fault = false;
     bool motor_enabled = false;
-    bool link = false;
     bool calibrated = false;
     bool config_saved = false;
 };
