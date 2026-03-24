@@ -3,15 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from brbase_app.protocol.commands import get_config, get_status, hello
-from brbase_app.protocol.parser import parse_kv_line
-from brbase_app.protocol.validators import is_supported_proto
-from brbase_app.transport.port_scanner import list_serial_ports
-from brbase_app.transport.serial_port import SerialConnection
+from brswdiy_app.protocol.commands import get_config, get_status, hello
+from brswdiy_app.protocol.parser import parse_kv_line
+from brswdiy_app.protocol.validators import is_supported_proto
+from brswdiy_app.transport.port_scanner import list_serial_ports
+from brswdiy_app.transport.serial_port import SerialConnection
 
 
 @dataclass
-class BRBaseDevice:
+class BaseDevice:
     connection: Optional[SerialConnection] = None
 
     def list_ports(self) -> list[str]:

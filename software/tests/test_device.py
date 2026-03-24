@@ -1,4 +1,4 @@
-from brbase_app.core.device import BRBaseDevice
+from brswdiy_app.core.device import BRBaseDevice
 
 
 def test_device_can_be_instantiated() -> None:

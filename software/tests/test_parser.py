@@ -1,4 +1,4 @@
-from brbase_app.protocol.parser import parse_kv_line
+from brswdiy_app.protocol.parser import parse_kv_line
 
 
 def test_parse_kv_line() -> None:

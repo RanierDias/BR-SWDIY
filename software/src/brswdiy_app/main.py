@@ -1,8 +1,8 @@
-from brbase_app.core.device import BRBaseDevice
+from brswdiy_app.core.device import BaseDevice
 
 
 def main() -> None:
-    device = BRBaseDevice()
+    device = BaseDevice()
     print("BRBase app scaffold ready.")
     print(f"Detected ports: {device.list_ports()}")
 

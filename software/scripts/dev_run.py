@@ -1,4 +1,4 @@
-from brbase_app.main import main
+from brswdiy_app.main import main
 
 
 if __name__ == "__main__":
