@@ -1,4 +1,4 @@
-from brswdiy_app.protocol.commands import get_config, get_status, hello
+from brswdiy_app.protocol.stream_commands import get_config, get_status, hello
 
 
 def test_commands() -> None:

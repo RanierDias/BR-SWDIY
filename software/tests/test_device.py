@@ -1,6 +1,6 @@
-from brswdiy_app.core.device import BRBaseDevice
+from brswdiy_app.core.controller import BaseDevice
 
 
 def test_device_can_be_instantiated() -> None:
-    device = BRBaseDevice()
+    device = BaseDevice()
     assert isinstance(device.list_ports(), list)
