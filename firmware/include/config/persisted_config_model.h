@@ -6,6 +6,7 @@ struct PersistedConfig
 {
     uint16_t magic = 0x4252;
     uint8_t version = 1;
+    uint16_t max_angle = 1080;
     uint8_t gain = 25;
     uint8_t output_limit = 25;
     bool safe_start = true;

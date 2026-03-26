@@ -5,6 +5,7 @@
 #include "constants/protocol_constants.h"
 #include "proto/command_parser.h"
 #include "proto/response_stream.h"
+#include "proto/serial_protocol.h"
 
 #include "types/device_state.h"
 #include "types/telemetry_types.h"
@@ -18,19 +19,18 @@
 
 static DeviceConfig g_config;
 static DeviceStatus g_status;
-static int16_t g_encoder_zero_offset;
 static InputCalibration g_input_calibration;
-static uint32_t g_last_output_ms = 0;
 static int8_t g_output = 0;
+static uint32_t g_last_output_ms = 0;
+static int16_t g_encoder_zero_offset = 0;
 static uint32_t g_last_fast_update = 0;
 static uint32_t g_last_slow_update = 0;
-
-static constexpr uint16_t FAST_INTERVAL = 1000;
-static constexpr uint16_t SLOW_INTERVAL = 5000;
-static constexpr uint16_t OUTPUT_TIMEOUT_MS = 250;
+static uint16_t g_max_angle_counts = 0;
 
 static void apply_default_config()
 {
+  g_config.max_angle = 1080;
+  g_max_angle_counts = 1080 * 10 / 3;
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
   g_config.output_limit = brswdiy::protocol::OUTPUT_LIMIT_DEFAULT;
   g_config.safe_start = true;
@@ -49,6 +49,7 @@ static PersistedConfig build_persisted_config()
 {
   PersistedConfig settings;
 
+  settings.max_angle = g_config.max_angle;
   settings.gain = g_config.gain;
   settings.output_limit = g_config.output_limit;
   settings.safe_start = g_config.safe_start;
@@ -67,6 +68,8 @@ static PersistedConfig build_persisted_config()
 
 static void apply_persisted_config(const PersistedConfig &settings)
 {
+  g_config.max_angle = settings.max_angle;
+  g_max_angle_counts = settings.max_angle * 20 / 3;
   g_config.gain = settings.gain;
   g_config.output_limit = settings.output_limit;
   g_config.safe_start = settings.safe_start;
@@ -125,14 +128,43 @@ static void update_encoder()
   g_status.angle = raw_position - g_encoder_zero_offset;
 }
 
-static int8_t get_requested_output()
+static int8_t apply_angle_limit(int8_t requested_output)
 {
-  if ((millis() - g_last_output_ms) <= OUTPUT_TIMEOUT_MS)
+  const uint16_t max_angle = g_max_angle_counts;
+  static constexpr uint16_t LOCK_ZONE = 300;
+
+  int16_t abs_angle = g_status.angle >= 0 ? g_status.angle : -g_status.angle;
+
+  if (abs_angle < max_angle - LOCK_ZONE)
   {
-    return g_output;
+    return requested_output;
   }
 
-  return 0;
+  int32_t distance = abs_angle - (max_angle - LOCK_ZONE);
+
+  if (distance < 0)
+  {
+    distance = 0;
+  }
+
+  if (distance > LOCK_ZONE)
+  {
+    distance = LOCK_ZONE;
+  }
+
+  int8_t lock_strength = distance * 100 / LOCK_ZONE;
+
+  if (g_status.angle > 0)
+  {
+    return -lock_strength;
+  }
+
+  if (g_status.angle < 0)
+  {
+    return lock_strength;
+  }
+
+  return requested_output;
 }
 
 static void update_motor_output()
@@ -142,7 +174,8 @@ static void update_motor_output()
     return;
   }
 
-  int8_t output = get_requested_output();
+  int8_t output = millis() - g_last_output_ms <= 250 ? g_output : 0;
+  output = apply_angle_limit(output);
 
   if (output > g_config.output_limit)
   {
@@ -168,7 +201,11 @@ void setup_app()
   g_status.state = DeviceState::BOOT;
   apply_default_config();
 
+  g_status.motor_enabled = true;
+  g_status.limit = g_config.output_limit;
+
   g_status.config_saved = load_config();
+
   g_encoder_zero_offset = get_encoder_position();
   g_status.state = DeviceState::READY;
 }
@@ -177,21 +214,20 @@ void update_app()
 {
   const uint32_t now = micros();
 
-  if ((now - g_last_fast_update) >= FAST_INTERVAL)
+  if ((now - g_last_fast_update) >= 1000)
   {
     g_last_fast_update = now;
 
-    process_command_parser();
     update_motor_output();
   }
 
-  if ((now - g_last_slow_update) >= SLOW_INTERVAL)
+  if ((now - g_last_slow_update) >= 5000)
   {
     g_last_slow_update = now;
 
     update_pedals();
     update_encoder();
-    send_telemetry_frame();
+    process_serial_protocol();
   }
 }
 
@@ -208,6 +244,11 @@ const DeviceStatus &get_status()
 const InputCalibration &get_pedal_calibration()
 {
   return g_input_calibration;
+}
+
+uint16_t get_max_angle()
+{
+  return g_config.max_angle;
 }
 
 bool save_config()
@@ -233,6 +274,18 @@ void reset_config()
 {
   apply_default_config();
   g_status.limit = g_config.output_limit;
+}
+
+bool set_max_angle(int value)
+{
+  if (value < 180 || value > 2048)
+  {
+    return false;
+  }
+
+  g_config.max_angle = value;
+  g_max_angle_counts = value * 10 / 3;
+  return true;
 }
 
 bool set_gain(int gain)

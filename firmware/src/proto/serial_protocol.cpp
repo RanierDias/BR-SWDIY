@@ -1,13 +1,7 @@
 #include "proto/serial_protocol.h"
 
 #include <Arduino.h>
-#include <string.h>
-#include <stdlib.h>
 
-#include "config/config_model.h"
-#include "config/calibration_model.h"
-#include "types/device_state.h"
-#include "types/telemetry_types.h"
 #include "app/app.h"
 
 namespace
@@ -28,381 +22,264 @@ namespace
 
   void handle_command(const char *raw)
   {
-    if (strcmp(raw, "GET_INFO") == 0)
-    {
-      Serial.print(F("INFO DEVICE=BRSWDIY FW="));
-      Serial.print(BRSWDIY_FW_VERSION);
-      Serial.print(F(" PROTO="));
-      Serial.print(BRSWDIY_PROTO_VERSION);
-      Serial.print(F(" HW="));
-      Serial.println(BRSWDIY_HW_VERSION);
-      return;
-    }
-
-    if (strcmp(raw, "GET_STATE") == 0)
+    if (strcmp(raw, "TEL") == 0)
     {
       const DeviceStatus &status = get_status();
 
-      Serial.print(F("STATE NAME="));
-      Serial.print(state_name(status.state));
-      Serial.print(F(" MOTOR="));
-      Serial.print(status.motor_enabled ? 1 : 0);
-      Serial.print(F(" FAULT="));
-      Serial.print(status.fault ? 1 : 0);
-      Serial.print(F(" CALIBRATED="));
-      Serial.print(status.calibrated ? 1 : 0);
-      Serial.print(F(" CONFIG_SAVED="));
-      Serial.println(status.config_saved ? 1 : 0);
-      return;
-    }
-
-    if (strcmp(raw, "GET_STATUS") == 0)
-    {
-      const DeviceStatus &status = get_status();
-
-      Serial.print(F("STATUS STATE="));
-      Serial.print(state_name(status.state));
-      Serial.print(F(" ANGLE="));
+      Serial.print(F("T "));
       Serial.print(status.angle);
-      Serial.print(F(" OUTPUT="));
-      Serial.print(status.output);
-      Serial.print(F(" LIMIT="));
-      Serial.print(status.limit);
-      Serial.print(F(" THROTTLE="));
+      Serial.print(" ");
       Serial.print(status.throttle);
-      Serial.print(F(" BRAKE="));
+      Serial.print(" ");
       Serial.print(status.brake);
-      Serial.print(F(" CLUTCH="));
-      Serial.print(status.clutch);
-      Serial.print(F(" FAULT="));
-      Serial.print(status.fault ? 1 : 0);
-      Serial.print(F(" CALIBRATED="));
-      Serial.println(status.calibrated ? 1 : 0);
+      Serial.print(" ");
+      Serial.println(status.clutch);
       return;
     }
 
-    if (strcmp(raw, "GET_CONFIG") == 0)
+    if (strcmp(raw, "RCE") == 0)
     {
-      const DeviceConfig &config = get_config();
-
-      Serial.print(F("CONFIG GAIN="));
-      Serial.print(config.gain);
-      Serial.print(F(" OUTPUT_LIMIT="));
-      Serial.print(config.output_limit);
-      Serial.print(F(" SAFE_START="));
-      Serial.print(config.safe_start ? 1 : 0);
-      Serial.print(F(" WATCHDOG_MS="));
-      Serial.println(config.watchdog_ms);
-      return;
-    }
-
-    if (strcmp(raw, "GET_CALIBRATION") == 0)
-    {
-      const InputCalibration &input = get_pedal_calibration();
-
-      Serial.print(F("CALIBRATION THROTTLE_MIN="));
-      Serial.print(input.throttle.min_raw);
-      Serial.print(F(" THROTTLE_MAX="));
-      Serial.print(input.throttle.max_raw);
-      Serial.print(F(" BRAKE_MIN="));
-      Serial.print(input.brake.min_raw);
-      Serial.print(F(" BRAKE_MAX="));
-      Serial.print(input.brake.max_raw);
-      Serial.print(F(" CLUTCH_MIN="));
-      Serial.print(input.clutch.min_raw);
-      Serial.print(F(" CLUTCH_MAX="));
-      Serial.print(input.clutch.max_raw);
-      Serial.print(F(" INVERT="));
-      Serial.println(input.invert_pedals ? 1 : 0);
-      return;
-    }
-
-    if (strncmp(raw, "SET_GAIN ", 9) == 0)
-    {
-      int value = atoi(raw + 9);
-
-      if (set_gain(value))
+      if (recenter_encoder())
       {
-        Serial.print(F("OK GAIN="));
-        Serial.println(get_config().gain);
+        Serial.println(F("OK RCE=1"));
       }
       else
       {
-        write_error(3, "INVALID_RANGE", "GAIN");
+        write_error(6, "NOT_CALIBRATED", "RCE");
       }
 
       return;
     }
 
-    if (strncmp(raw, "SET_OUTPUT ", 11) == 0)
+    if (strcmp(raw, "CAL") == 0)
     {
-      int value = atoi(raw + 11);
+      const InputCalibration &calibration = get_pedal_calibration();
 
-      if (set_output(value))
+      Serial.print(F("C A="));
+      Serial.print(get_max_angle());
+      Serial.print(F(" I="));
+      Serial.print(calibration.invert_pedals ? 1 : 0);
+
+      Serial.print(F(" TMN="));
+      Serial.print(calibration.throttle.min_raw);
+      Serial.print(F(" TMX="));
+      Serial.print(calibration.throttle.max_raw);
+
+      Serial.print(F(" BMN="));
+      Serial.print(calibration.brake.min_raw);
+      Serial.print(F(" BMX="));
+      Serial.print(calibration.brake.max_raw);
+
+      Serial.print(F(" CMN="));
+      Serial.print(calibration.clutch.min_raw);
+      Serial.print(F(" CMX="));
+      Serial.println(calibration.clutch.max_raw);
+      return;
+    }
+
+    if (strcmp(raw, "HI") == 0)
+    {
+      Serial.print(F("OK BRSWDIY"));
+      return;
+    }
+
+    if (strncmp(raw, "ANG ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_max_angle(value))
       {
-        Serial.print(F("OK OUTPUT="));
+        Serial.print(F("OK ANG="));
         Serial.println(value);
       }
       else
       {
-        write_error(3, "INVALID_RANGE", "OUTPUT");
+        write_error(3, "INVALID_RANGE", "ANG");
       }
 
       return;
     }
 
-    if (strncmp(raw, "SET_OUTPUT_LIMIT ", 17) == 0)
+    if (strncmp(raw, "INV ", 4) == 0)
     {
-      int value = atoi(raw + 17);
-
-      if (set_output_limit(value))
-      {
-        Serial.print(F("OK OUTPUT_LIMIT="));
-        Serial.println(get_config().output_limit);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "OUTPUT_LIMIT");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_SAFE_START ", 15) == 0)
-    {
-      int value = atoi(raw + 15);
+      const int value = atoi(raw + 4);
 
       if (value != 0 && value != 1)
       {
-        write_error(4, "INVALID_STATE", "SAFE_START");
-        return;
-      }
-
-      if (set_safe_start(value != 0))
-      {
-        Serial.print(F("OK SAFE_START="));
-        Serial.println(get_config().safe_start ? 1 : 0);
-      }
-      else
-      {
-        write_error(4, "INVALID_STATE", "SAFE_START");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_WATCHDOG ", 13) == 0)
-    {
-      int value = atoi(raw + 13);
-
-      if (set_watchdog(value))
-      {
-        Serial.print(F("OK WATCHDOG_MS="));
-        Serial.println(get_config().watchdog_ms);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "WATCHDOG_MS");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_THROTTLE_MAX ", 17) == 0)
-    {
-      int value = atoi(raw + 17);
-
-      if (set_throttle_max(value))
-      {
-        Serial.print(F("OK THROTTLE_MAX="));
-        Serial.println(get_pedal_calibration().throttle.max_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "THROTTLE_MAX");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_THROTTLE_MIN ", 17) == 0)
-    {
-      int value = atoi(raw + 17);
-
-      if (set_throttle_min(value))
-      {
-        Serial.print(F("OK THROTTLE_MIN="));
-        Serial.println(get_pedal_calibration().throttle.min_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "THROTTLE_MIN");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_BRAKE_MAX ", 14) == 0)
-    {
-      int value = atoi(raw + 14);
-
-      if (set_brake_max(value))
-      {
-        Serial.print(F("OK BRAKE_MAX="));
-        Serial.println(get_pedal_calibration().brake.max_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "BRAKE_MAX");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_BRAKE_MIN ", 14) == 0)
-    {
-      int value = atoi(raw + 14);
-
-      if (set_brake_min(value))
-      {
-        Serial.print(F("OK BRAKE_MIN="));
-        Serial.println(get_pedal_calibration().brake.min_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "BRAKE_MIN");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_CLUTCH_MAX ", 15) == 0)
-    {
-      int value = atoi(raw + 15);
-
-      if (set_clutch_max(value))
-      {
-        Serial.print(F("OK CLUTCH_MAX="));
-        Serial.println(get_pedal_calibration().clutch.max_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "CLUTCH_MAX");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_CLUTCH_MIN ", 15) == 0)
-    {
-      int value = atoi(raw + 15);
-
-      if (set_clutch_min(value))
-      {
-        Serial.print(F("OK CLUTCH_MIN="));
-        Serial.println(get_pedal_calibration().clutch.min_raw);
-      }
-      else
-      {
-        write_error(3, "INVALID_RANGE", "CLUTCH_MIN");
-      }
-
-      return;
-    }
-
-    if (strncmp(raw, "SET_PEDAL_INVERT ", 17) == 0)
-    {
-      int value = atoi(raw + 17);
-
-      if (value != 0 && value != 1)
-      {
-        write_error(3, "INVALID_RANGE", "PEDAL_INVERT");
+        write_error(4, "INVALID_STATE", "INV");
         return;
       }
 
       if (set_pedal_invert(value != 0))
       {
-        Serial.print(F("OK PEDAL_INVERT="));
-        Serial.println(get_pedal_calibration().invert_pedals ? 1 : 0);
+        Serial.print(F("OK INV="));
+        Serial.println(value);
       }
       else
       {
-        write_error(4, "INVALID_STATE", "PEDAL_INVERT");
+        write_error(6, "NOT_CALIBRATED", "INV");
       }
 
       return;
     }
 
-    if (strcmp(raw, "SAVE_CONFIG") == 0)
+    if (strncmp(raw, "TMN ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_throttle_min(value))
+      {
+        Serial.print(F("OK TMN="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "TMN");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "TMX ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_throttle_max(value))
+      {
+        Serial.print(F("OK TMX="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "TMX");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "BMN ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_brake_min(value))
+      {
+        Serial.print(F("OK BMN="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "BMN");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "BMX ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_brake_max(value))
+      {
+        Serial.print(F("OK BMX="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "BMX");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "CMN ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_clutch_min(value))
+      {
+        Serial.print(F("OK CMN="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "CMN");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "CMX ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_clutch_max(value))
+      {
+        Serial.print(F("OK CMX="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "CMX");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "FFB ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (value != 0 && value != 1)
+      {
+        write_error(4, "INVALID_STATE", "FFB");
+        return;
+      }
+
+      if (handle_motor(value != 0))
+      {
+        Serial.print(F("OK FFB="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(6, "NOT_CALIBRATED", "FFB");
+      }
+
+      return;
+    }
+
+    if (strcmp(raw, "SAVE") == 0)
     {
       if (save_config())
       {
-        Serial.println(F("OK SAVED=1"));
+        Serial.println(F("OK SAVE=1"));
       }
       else
       {
-        write_error(7, "EEPROM_ERROR", "SAVE_CONFIG");
+        write_error(7, "EEPROM_ERROR", "SAVE");
       }
 
       return;
     }
 
-    if (strcmp(raw, "LOAD_CONFIG") == 0)
+    if (strcmp(raw, "LOAD") == 0)
     {
       if (load_config())
       {
-        Serial.println(F("OK LOADED=1"));
+        Serial.println(F("OK LOAD=1"));
       }
       else
       {
-        write_error(7, "EEPROM_ERROR", "LOAD_CONFIG");
+        write_error(7, "EEPROM_ERROR", "LOAD");
       }
 
       return;
     }
 
-    if (strcmp(raw, "RESET_CONFIG") == 0)
+    if (strcmp(raw, "RESET") == 0)
     {
       reset_config();
-
       Serial.println(F("OK RESET=1"));
-      return;
-    }
-
-    if (strcmp(raw, "RECENTER") == 0)
-    {
-      recenter_encoder();
-
-      Serial.println(F("OK RECENTERED"));
-      return;
-    }
-
-    if (strcmp(raw, "MOTOR_START") == 0)
-    {
-      handle_motor(true);
-
-      Serial.println(F("OK MOTOR=1"));
-      return;
-    }
-
-    if (strcmp(raw, "MOTOR_STOP") == 0)
-    {
-      handle_motor(false);
-      set_output(0);
-
-      Serial.println(F("OK MOTOR=0"));
-      return;
-    }
-
-    if (strcmp(raw, "GET_ERRORS") == 0)
-    {
-      Serial.println(F("ERRORS COUNT=0"));
-      return;
-    }
-
-    if (strcmp(raw, "CLEAR_ERRORS") == 0)
-    {
-      Serial.println(F("CLEARED=1"));
       return;
     }
 

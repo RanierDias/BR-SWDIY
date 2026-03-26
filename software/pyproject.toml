@@ -9,6 +9,7 @@ description = "Desktop app for BRSWDIY"
 requires-python = ">=3.11"
 dependencies = [
     "pyserial>=3.5",
+    "dearpygui (>=2.2,<3.0)",
 ]
 
 [project.optional-dependencies]
