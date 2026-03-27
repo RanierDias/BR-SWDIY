@@ -10,9 +10,9 @@ struct DeviceStatus
     int16_t center = 0;
     uint8_t output = 0;
     uint8_t limit = 0;
-    uint8_t throttle = 0;
-    uint8_t brake = 0;
-    uint8_t clutch = 0;
+    uint16_t throttle = 0;
+    uint16_t brake = 0;
+    uint16_t clutch = 0;
     uint8_t buttons = 0;
     bool fault = false;
     bool motor_enabled = false;

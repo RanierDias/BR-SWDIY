@@ -1,17 +1,14 @@
 #include "app/app.h"
-
 #include <Arduino.h>
 
 #include "constants/protocol_constants.h"
 #include "proto/command_parser.h"
 #include "proto/response_stream.h"
 #include "proto/serial_protocol.h"
-
 #include "types/device_state.h"
 #include "types/telemetry_types.h"
 #include "config/config_model.h"
 #include "config/calibration_model.h"
-
 #include "hw/pedals.h"
 #include "hw/encoder.h"
 #include "hw/motor.h"
@@ -27,10 +24,12 @@ static uint32_t g_last_fast_update = 0;
 static uint32_t g_last_slow_update = 0;
 static uint16_t g_max_angle_counts = 0;
 
+static constexpr uint16_t LOCK_ZONE = 50;
+
 static void apply_default_config()
 {
-  g_config.max_angle = 1080;
-  g_max_angle_counts = 1080 * 10 / 3;
+  g_config.max_angle = 360;
+  g_max_angle_counts = 1200;
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
   g_config.output_limit = brswdiy::protocol::OUTPUT_LIMIT_DEFAULT;
   g_config.safe_start = true;
@@ -69,7 +68,7 @@ static PersistedConfig build_persisted_config()
 static void apply_persisted_config(const PersistedConfig &settings)
 {
   g_config.max_angle = settings.max_angle;
-  g_max_angle_counts = settings.max_angle * 20 / 3;
+  g_max_angle_counts = settings.max_angle * 10 / 3;
   g_config.gain = settings.gain;
   g_config.output_limit = settings.output_limit;
   g_config.safe_start = settings.safe_start;
@@ -84,108 +83,63 @@ static void apply_persisted_config(const PersistedConfig &settings)
   g_input_calibration.invert_pedals = settings.invert_pedals;
 }
 
-static uint8_t normalize_pedal(uint16_t raw, const PedalCalibration &input)
+static inline uint16_t normalize_pedal(uint16_t raw, const PedalCalibration &input)
 {
   if (input.max_raw <= input.min_raw)
-  {
     return 0;
-  }
 
-  uint16_t value = raw;
-
-  if (value < input.min_raw)
-    value = input.min_raw;
-  if (value > input.max_raw)
-    value = input.max_raw;
-
-  uint16_t range = input.max_raw - input.min_raw;
-  uint16_t difference = value - input.min_raw;
-
-  uint8_t result = (uint32_t(difference) * 100) / range;
+  uint16_t value = constrain(raw, input.min_raw, input.max_raw);
 
   if (g_input_calibration.invert_pedals)
   {
-    result = 100 - result;
+    return 1023 - value;
   }
-
-  return result;
+  return value;
 }
 
 static void update_pedals()
 {
-  uint16_t throttle_raw = read_throttle_raw();
-  uint16_t brake_raw = read_brake_raw();
-  uint16_t clutch_raw = read_clutch_raw();
-
-  g_status.throttle = normalize_pedal(throttle_raw, g_input_calibration.throttle);
-  g_status.brake = normalize_pedal(brake_raw, g_input_calibration.brake);
-  g_status.clutch = normalize_pedal(clutch_raw, g_input_calibration.clutch);
+  g_status.throttle = normalize_pedal(read_throttle_raw(), g_input_calibration.throttle);
+  g_status.brake = normalize_pedal(read_brake_raw(), g_input_calibration.brake);
+  g_status.clutch = normalize_pedal(read_clutch_raw(), g_input_calibration.clutch);
 }
 
 static void update_encoder()
 {
-  const int16_t raw_position = get_encoder_position();
-  g_status.angle = raw_position - g_encoder_zero_offset;
+  g_status.angle = get_encoder_position() - g_encoder_zero_offset;
 }
 
 static int8_t apply_angle_limit(int8_t requested_output)
 {
-  const uint16_t max_angle = g_max_angle_counts;
-  static constexpr uint16_t LOCK_ZONE = 300;
+  const int16_t current_angle = g_status.angle;
+  const uint16_t threshold = g_max_angle_counts - LOCK_ZONE;
 
-  int16_t abs_angle = g_status.angle >= 0 ? g_status.angle : -g_status.angle;
+  uint16_t abs_angle = (current_angle < 0) ? -current_angle : current_angle;
 
-  if (abs_angle < max_angle - LOCK_ZONE)
+  if (abs_angle < threshold)
   {
     return requested_output;
   }
 
-  int32_t distance = abs_angle - (max_angle - LOCK_ZONE);
-
-  if (distance < 0)
-  {
-    distance = 0;
-  }
+  int16_t distance = abs_angle - threshold;
 
   if (distance > LOCK_ZONE)
-  {
     distance = LOCK_ZONE;
-  }
 
-  int8_t lock_strength = distance * 100 / LOCK_ZONE;
+  int8_t lock_strength = (int8_t)(distance << 1);
 
-  if (g_status.angle > 0)
-  {
-    return -lock_strength;
-  }
-
-  if (g_status.angle < 0)
-  {
-    return lock_strength;
-  }
-
-  return requested_output;
+  return (current_angle > 0) ? -lock_strength : lock_strength;
 }
 
 static void update_motor_output()
 {
   if (!g_status.motor_enabled)
-  {
     return;
-  }
 
-  int8_t output = millis() - g_last_output_ms <= 250 ? g_output : 0;
+  int8_t output = (millis() - g_last_output_ms <= 250) ? g_output : 0;
+
   output = apply_angle_limit(output);
-
-  if (output > g_config.output_limit)
-  {
-    output = g_config.output_limit;
-  }
-
-  if (output < -g_config.output_limit)
-  {
-    output = -g_config.output_limit;
-  }
+  output = constrain(output, -g_config.output_limit, g_config.output_limit);
 
   g_status.output = output;
   set_motor_output(output);
@@ -203,7 +157,6 @@ void setup_app()
 
   g_status.motor_enabled = true;
   g_status.limit = g_config.output_limit;
-
   g_status.config_saved = load_config();
 
   g_encoder_zero_offset = get_encoder_position();
@@ -218,6 +171,7 @@ void update_app()
   {
     g_last_fast_update = now;
 
+    update_encoder();
     update_motor_output();
   }
 
@@ -226,7 +180,6 @@ void update_app()
     g_last_slow_update = now;
 
     update_pedals();
-    update_encoder();
     process_serial_protocol();
   }
 }
@@ -279,12 +232,11 @@ void reset_config()
 bool set_max_angle(int value)
 {
   if (value < 180 || value > 2048)
-  {
     return false;
-  }
 
   g_config.max_angle = value;
-  g_max_angle_counts = value * 10 / 3;
+
+  g_max_angle_counts = (uint16_t)((uint32_t)value * 10 / 3);
   return true;
 }
 
@@ -445,11 +397,9 @@ bool set_pedal_invert(bool enable)
 bool set_output(int value)
 {
   if (value < -100 || value > 100)
-  {
     return false;
-  }
 
-  g_output = value;
+  g_output = (int8_t)value;
   g_last_output_ms = millis();
   return true;
 }

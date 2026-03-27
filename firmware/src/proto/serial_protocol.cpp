@@ -57,8 +57,15 @@ namespace
 
       Serial.print(F("C A="));
       Serial.print(get_max_angle());
+
       Serial.print(F(" I="));
       Serial.print(calibration.invert_pedals ? 1 : 0);
+
+      Serial.print(F(" O="));
+      Serial.print(get_config().output_limit);
+
+      Serial.print(F(" M="));
+      Serial.print(get_status().motor_enabled);
 
       Serial.print(F(" TMN="));
       Serial.print(calibration.throttle.min_raw);
@@ -79,7 +86,7 @@ namespace
 
     if (strcmp(raw, "HI") == 0)
     {
-      Serial.print(F("OK BRSWDIY"));
+      Serial.println(F("OK BRSWDIY"));
       return;
     }
 
@@ -118,6 +125,23 @@ namespace
       else
       {
         write_error(6, "NOT_CALIBRATED", "INV");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "AMX ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_output_limit(value))
+      {
+        Serial.print(F("OK AMX="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "AMX");
       }
 
       return;
