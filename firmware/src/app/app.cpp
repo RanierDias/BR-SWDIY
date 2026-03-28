@@ -85,15 +85,19 @@ static void apply_persisted_config(const PersistedConfig &settings)
 
 static inline uint16_t normalize_pedal(uint16_t raw, const PedalCalibration &input)
 {
-  if (input.max_raw <= input.min_raw)
-    return 0;
+  if (raw >= input.max_raw)
+    return g_input_calibration.invert_pedals ? 0 : 1023;
+  if (raw <= input.min_raw)
+    return g_input_calibration.invert_pedals ? 1023 : 0;
 
-  uint16_t value = constrain(raw, input.min_raw, input.max_raw);
+  uint16_t range = input.max_raw - input.min_raw;
+  uint16_t value = (uint16_t)((uint32_t)(raw - input.min_raw) * 1023 / range);
 
   if (g_input_calibration.invert_pedals)
   {
     return 1023 - value;
   }
+
   return value;
 }
 

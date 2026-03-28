@@ -75,7 +75,7 @@ class App(ctk.CTk):
 
         self.res_label = ctk.CTkLabel(
             header,
-            text="Welcome",
+            text="Se beber não dirija",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=TEXT_DIM,
         )
@@ -89,14 +89,14 @@ class App(ctk.CTk):
         )
         self.status_label.pack(side="left", padx=(0, 10))
 
-        self.retry_button = ctk.CTkButton(
+        self.switch_button = ctk.CTkButton(
             right_box,
-            text="Retry",
+            text="Connect",
             width=90,
             fg_color=ACCENT,
             hover_color=ACCENT_SOFT,
         )
-        self.retry_button.pack(side="left")
+        self.switch_button.pack(side="left")
 
     def _build_main(self) -> None:
         main = ctk.CTkFrame(self, fg_color="transparent")
@@ -151,7 +151,7 @@ class App(ctk.CTk):
 
         max_angle_label = ctk.CTkLabel(
             angle_box,
-            text="Max Angle",
+            text="Lock Angle",
             text_color=TEXT,
         )
         max_angle_label.grid(row=0, column=0, sticky="w")
@@ -166,14 +166,14 @@ class App(ctk.CTk):
         self.max_angle_slider = ctk.CTkSlider(
             body,
             from_=180,
-            to=2048,
-            number_of_steps=1868,
+            to=1080,
+            number_of_steps=900,
             fg_color=BG_ELEMENT,
             progress_color=ACCENT,
             button_color=ACCENT,
             button_hover_color=ACCENT,
         )
-        self.max_angle_slider.set(1080)
+        self.max_angle_slider.set(940)
         self.max_angle_slider.pack(fill="x", pady=(0, 14))
 
         output_box = ctk.CTkFrame(body, fg_color="transparent")
@@ -239,21 +239,7 @@ class App(ctk.CTk):
             text_color=TEXT,
         )
         self.angle_value_label.pack(
-            anchor="center", pady=(10, 10), padx=(15, 0))
-
-        self.angle_slider = ctk.CTkSlider(
-            body,
-            from_=-720,
-            to=720,
-            number_of_steps=1440,
-            state="disabled",
-            fg_color=BG_ELEMENT,
-            progress_color=ACCENT,
-            button_color=ACCENT,
-            button_hover_color=ACCENT,
-        )
-        self.angle_slider.set(0)
-        self.angle_slider.pack(fill="x", padx=20, pady=(0, 20))
+            anchor="center", pady=(12, 16), padx=(15, 0))
 
         pedals_box = ctk.CTkFrame(body, fg_color="transparent")
         pedals_box.pack(fill="both", expand=True, pady=(10, 0))
@@ -277,21 +263,16 @@ class App(ctk.CTk):
         )
         label.pack(pady=(0, 8))
 
-        slider = ctk.CTkSlider(
+        bar = ctk.CTkProgressBar(
             box,
-            from_=0,
-            to=100,
-            number_of_steps=100,
             orientation="vertical",
             height=220,
-            state="disabled",
+            width=20,
             fg_color=BG_ELEMENT,
-            progress_color=ACCENT,
-            button_color=ACCENT,
-            button_hover_color=ACCENT,
+            progress_color=ACCENT
         )
-        slider.set(0)
-        slider.pack()
+        bar.set(0)
+        bar.pack()
 
         value = ctk.CTkLabel(
             box,
@@ -301,13 +282,13 @@ class App(ctk.CTk):
         value.pack(pady=(8, 0))
 
         if name == "Throttle":
-            self.throttle_slider = slider
+            self.throttle_slider = bar
             self.throttle_value_label = value
         elif name == "Brake":
-            self.brake_slider = slider
+            self.brake_slider = bar
             self.brake_value_label = value
         elif name == "Clutch":
-            self.clutch_slider = slider
+            self.clutch_slider = bar
             self.clutch_value_label = value
 
     def _build_pedals_panel(self) -> None:
@@ -354,7 +335,7 @@ class App(ctk.CTk):
 
         offset_label = ctk.CTkLabel(
             buttons_box,
-            text="0",
+            text="5",
             text_color=TEXT_DIM
         )
         offset_label.grid(row=0, column=1, padx=5)
@@ -370,15 +351,15 @@ class App(ctk.CTk):
 
         offset_slider = ctk.CTkSlider(
             section,
-            from_=-10,
-            to=10,
-            number_of_steps=20,
+            from_=0,
+            to=15,
+            number_of_steps=15,
             fg_color=BG_MAIN,
             progress_color=ACCENT,
             button_color=ACCENT,
             button_hover_color=ACCENT,
         )
-        offset_slider.set(0)
+        offset_slider.set(5)
         offset_slider.pack(fill="x", padx=10, pady=(10, 12))
 
         if name == "Throttle":
@@ -445,7 +426,7 @@ class App(ctk.CTk):
         self.reset_button.pack(side="left", padx=4)
 
     def _bind_callbacks(self) -> None:
-        self.retry_button.configure(command=self._on_retry)
+        self.switch_button.configure(command=self._on_switch)
 
         self.max_angle_slider.configure(command=self._on_max_angle_slider)
         self.output_limit_slider.configure(
@@ -507,14 +488,15 @@ class App(ctk.CTk):
     def _on_offset_slider_change(self, label: ctk.CTkLabel, value: float) -> None:
         label.configure(text=str(int(value)))
 
-    def _on_retry(self) -> None:
+    def _on_switch(self) -> None:
         self.status_label.configure(text="Searching...")
 
         if self.app_state.connected:
+            self.controller.disconnect()
             self.app_state.connected = False
             self.app_state.detected_port = None
-            self.controller.disconnect()
             self.app_state.status_text = "Disconnect"
+            self.switch_button.configure(text="Connect")
             self.status_label.configure(text=self.app_state.status_text)
             return
 
@@ -533,6 +515,8 @@ class App(ctk.CTk):
             self.app_state.detected_port = port
             self.app_state.status_text = f"Connected: {port}"
             self.status_label.configure(text=self.app_state.status_text)
+            self.switch_button.configure(
+                text="Disconnect", hover_color=BG_MAIN)
 
             self._read_calibration_into_ui()
 
@@ -545,48 +529,43 @@ class App(ctk.CTk):
     def _update_loop(self) -> None:
         if self.controller.is_connected():
             try:
-                frame = self.controller.read_telemetry()
+                self.app_state.angle = int(
+                    self.controller.telemetry.angle * 3 / 10)
+                self.app_state.throttle.current = self.controller.telemetry.throttle
+                self.app_state.brake.current = self.controller.telemetry.brake
+                self.app_state.clutch.current = self.controller.telemetry.clutch
 
-                if frame is not None:
-                    self.app_state.angle = int(frame.angle * 3 / 10)
-                    self.app_state.throttle.current = frame.throttle
-                    self.app_state.brake.current = frame.brake
-                    self.app_state.clutch.current = frame.clutch
-
-                    self._refresh_live_monitor()
+                self._refresh_live_monitor()
 
             except Exception as exc:
                 self.app_state.last_error = str(exc)
                 self.res_label.configure(text=f"Error: {exc}")
 
-        self.after(25, self._update_loop)
+        self.after(30, self._update_loop)
 
     def _refresh_live_monitor(self) -> None:
-        throttle = int(self.app_state.throttle.current /
-                       self.app_state.throttle.maximum * 100)
-        brake = int(self.app_state.brake.current /
-                    self.app_state.brake.maximum * 100)
-        clutch = int(self.app_state.clutch.current /
-                     self.app_state.clutch.maximum * 100)
+        throttle = self.app_state.throttle.current / self.app_state.throttle.maximum
+        brake = self.app_state.brake.current / self.app_state.brake.maximum
+        clutch = self.app_state.clutch.current / self.app_state.clutch.maximum
 
         self.angle_value_label.configure(text=f"{self.app_state.angle}°")
-        self.angle_slider.set(self.app_state.angle)
 
         self.throttle_slider.set(throttle)
         self.brake_slider.set(brake)
         self.clutch_slider.set(clutch)
 
         self.throttle_value_label.configure(
-            text=str(throttle))
+            text=str(int(throttle * 100)))
         self.brake_value_label.configure(
-            text=str(brake))
+            text=str(int(brake * 100)))
         self.clutch_value_label.configure(
-            text=str(clutch))
+            text=str(int(clutch * 100)))
 
     def _read_calibration_into_ui(self) -> None:
         frame = self.controller.read_calibration()
 
-        if frame is None:
+        if not frame:
+            self.res_label.configure(text="Don't loaded config")
             return
 
         self.app_state.max_angle = frame.max_angle
@@ -594,27 +573,25 @@ class App(ctk.CTk):
         self.app_state.invert_pedals = frame.invert_pedals
         self.app_state.ffb_enabled = frame.motor_enable
 
-        self.app_state.throttle.minimum = frame.throttle_min
-        self.app_state.throttle.maximum = frame.throttle_max
+        self.app_state.ffb_enabled = frame.motor_enable
 
-        self.app_state.brake.minimum = frame.brake_min
-        self.app_state.brake.maximum = frame.brake_max
+        self.app_state.throttle.minimum = 0
+        self.app_state.throttle.maximum = 1023 if frame.throttle_max < 1024 else 4095 if frame.throttle_max < 4096 else 65535
 
-        self.app_state.clutch.minimum = frame.clutch_min
-        self.app_state.clutch.maximum = frame.clutch_max
+        self.app_state.brake.minimum = 0
+        self.app_state.brake.maximum = 1023 if frame.brake_max < 1024 else 4095 if frame.brake_max < 4096 else 65535
 
-        self.max_angle_slider.set(frame.max_angle)
-        self.max_angle_value.configure(text=str(frame.max_angle))
+        self.app_state.clutch.minimum = 0
+        self.app_state.clutch.maximum = 1023 if frame.clutch_max < 1024 else 4095 if frame.clutch_max < 4096 else 65535
 
-        if frame.invert_pedals:
-            self.invert_checkbox.select()
-        else:
-            self.invert_checkbox.deselect()
+        self.max_angle_slider.set(self.app_state.max_angle)
+        self.max_angle_value.configure(text=str(self.app_state.max_angle))
+        self.output_limit_slider.set(self.app_state.output_limit)
+        self.output_limit_value.configure(
+            text=str(self.app_state.output_limit))
 
-        if frame.motor_enable:
-            self.ffb_checkbox.select()
-        else:
-            self.ffb_checkbox.deselect()
+        self.invert_checkbox.select() if frame.invert_pedals else self.invert_checkbox.deselect()
+        self.ffb_checkbox.select() if frame.motor_enable else self.ffb_checkbox.deselect()
 
     def _on_apply_steering(self) -> None:
         if not self.controller.is_connected():
@@ -675,25 +652,13 @@ class App(ctk.CTk):
             self.res_label.configure(text=f"Error: {exc}")
 
     def _get_pedal_current_and_offset(self, pedal_name: str) -> tuple[int, int]:
-        if pedal_name == "throttle":
-            return (
-                self.app_state.throttle.current,
-                int(self.throttle_offset_slider.get() * 1023 / 100),
-            )
+        pedal_state = getattr(self.app_state, pedal_name)
+        slider = getattr(self, f"{pedal_name}_offset_slider")
 
-        if pedal_name == "brake":
-            return (
-                self.app_state.brake.current,
-                int(self.brake_offset_slider.get() * 1023 / 100),
-            )
+        current_raw = pedal_state.current
+        offset = int(slider.get() * 1023 / 100)
 
-        if pedal_name == "clutch":
-            return (
-                self.app_state.clutch.current,
-                int(self.clutch_offset_slider.get() * 1023 / 100),
-            )
-
-        raise ValueError(f"Unknown pedal: {pedal_name}")
+        return current_raw, offset
 
     def _on_set_pedal(self, pedal_name: str, target: str) -> None:
         if not self.controller.is_connected():
@@ -701,54 +666,36 @@ class App(ctk.CTk):
 
         try:
             current, offset = self._get_pedal_current_and_offset(pedal_name)
-            value = current + offset
-
             inverted = self.invert_checkbox.get() == 1
-
-            final_target = target
-
-            if inverted:
-                final_target = "max" if target == "min" else "min"
-
-            self._apply_pedal_value(pedal_name, final_target, value)
-
             pedal_state = getattr(self.app_state, pedal_name)
 
             if target == "min":
-                pedal_state.minimum = value
+                value = (current + offset) if not inverted else (current - offset)
             else:
-                pedal_state.maximum = value
+                value = (current - offset) if not inverted else (current + offset)
+
+            value = max(0, min(pedal_state.maximum, value))
+
+            self._apply_pedal_value(pedal_name, target, value)
 
             self.res_label.configure(
-                text=f"{pedal_name.capitalize()} {target} set: {current}")
+                text=f"{pedal_name.capitalize()} {target} set: {value} (Raw: {current})")
 
         except Exception as exc:
             self.app_state.last_error = str(exc)
             self.res_label.configure(text=f"Error: {exc}")
 
     def _apply_pedal_value(self, pedal_name: str, target: str, value: int) -> None:
-        if pedal_name == "throttle":
-            if target == "min":
-                self.controller.set_throttle_min(value)
-            else:
-                self.controller.set_throttle_max(value)
-            return
+        methods = {
+            "throttle": {"min": self.controller.set_throttle_min, "max": self.controller.set_throttle_max},
+            "brake":    {"min": self.controller.set_brake_min,    "max": self.controller.set_brake_max},
+            "clutch":   {"min": self.controller.set_clutch_min,   "max": self.controller.set_clutch_max},
+        }
 
-        if pedal_name == "brake":
-            if target == "min":
-                self.controller.set_brake_min(value)
-            else:
-                self.controller.set_brake_max(value)
-            return
-
-        if pedal_name == "clutch":
-            if target == "min":
-                self.controller.set_clutch_min(value)
-            else:
-                self.controller.set_clutch_max(value)
-            return
-
-        raise ValueError(f"Unknown pedal: {pedal_name}")
+        if pedal_name in methods:
+            methods[pedal_name][target](value)
+        else:
+            raise ValueError(f"Unknown pedal: {pedal_name}")
 
     def _on_save(self) -> None:
         if not self.controller.is_connected():
@@ -767,8 +714,9 @@ class App(ctk.CTk):
             return
 
         try:
+            self.res_label.configure(text="Loading...")
             self.controller.load()
-            self._read_calibration_into_ui()
+            self.after(50, self._read_calibration_into_ui)
             self.res_label.configure(text="Loaded from device")
 
         except Exception as exc:
@@ -781,7 +729,7 @@ class App(ctk.CTk):
 
         try:
             self.controller.reset_default()
-            self._read_calibration_into_ui()
+            self.after(50, self._read_calibration_into_ui)
             self.res_label.configure(text="Defaults restored")
 
         except Exception as exc:

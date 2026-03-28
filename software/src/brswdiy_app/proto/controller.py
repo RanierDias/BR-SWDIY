@@ -54,6 +54,7 @@ class Controller:
         self.last_error: str | None = None
 
         self.command_queue = queue.Queue()
+        self.response_queue = queue.Queue()
         self.comm_thread = None
 
     def connect(self, port: str, baudrate: int = 115200) -> None:
@@ -105,12 +106,27 @@ class Controller:
             try:
                 while not self.command_queue.empty():
                     cmd = self.command_queue.get_nowait()
+
                     self.connection.send_line(cmd)
 
-                self.connection.send_line(build_telemetry())
-                line = self.connection.read_line()
+                    if cmd == "CAL":
+                        for _ in range(20):
+                            line = self.connection.read_line()
 
+                            if not line:
+                                break
+
+                            frame = parse_line(line)
+
+                            if isinstance(frame, CalibrationFrame):
+                                self.response_queue.put(frame)
+                                break
+
+                self.connection.send_line(build_telemetry())
+
+                line = self.connection.read_line()
                 frame = parse_line(line)
+
                 if isinstance(frame, TelemetryFrame):
                     self.telemetry.angle = frame.angle
                     self.telemetry.throttle = frame.throttle
@@ -118,85 +134,70 @@ class Controller:
                     self.telemetry.clutch = frame.clutch
 
                 time.sleep(0.001)
+
             except Exception:
                 self.connected = False
 
     def send_command(self, cmd_str: str):
         self.command_queue.put(cmd_str)
 
-    def read_telemetry(self) -> TelemetryFrame | None:
-        self.connection.send_line(build_telemetry())
-        line = self.connection.read_line()
-
-        frame = parse_line(line)
-
-        if isinstance(frame, TelemetryFrame):
-            self.telemetry.angle = frame.angle
-            self.telemetry.throttle = frame.throttle
-            self.telemetry.brake = frame.brake
-            self.telemetry.clutch = frame.clutch
-            return frame
-
-        if isinstance(frame, ErrorFrame):
-            self.last_error = f"{frame.code}:{frame.name}:{frame.field}"
-            return None
-
-        return None
-
     def read_calibration(self) -> CalibrationFrame | None:
-        self.connection.send_line(build_calibration())
-        line = self.connection.read_line()
+        while not self.response_queue.empty():
+            self.response_queue.get()
 
-        frame = parse_line(line)
+        self.send_command(build_calibration())
 
-        if isinstance(frame, CalibrationFrame):
-            return frame
+        try:
+            frame = self.response_queue.get(timeout=1.0)
 
-        if isinstance(frame, ErrorFrame):
-            self.last_error = f"{frame.code}:{frame.name}:{frame.field}"
+            if isinstance(frame, CalibrationFrame):
+                return frame
+            if isinstance(frame, ErrorFrame):
+                self.last_error = f"{frame.code}:{frame.name}"
+                return None
+        except queue.Empty:
+            self.last_error = "Timeout: No response"
             return None
-
-        return None
 
     def apply_steering(self, max_angle: int, output_limit: int) -> None:
-        self.connection.send_line(build_set_max_angle(max_angle))
-        self.connection.send_line(build_set_output_limit(output_limit))
+        self.send_command(build_set_max_angle(max_angle))
+        self.send_command(build_set_output_limit(output_limit))
 
     def recenter(self) -> None:
-        self.connection.send_line(build_recenter())
+        self.send_command(build_recenter())
 
     def set_throttle_min(self, value: int) -> None:
-        self.connection.send_line(build_set_throttle_min(value))
+        self.send_command(build_set_throttle_min(value))
 
     def set_throttle_max(self, value: int) -> None:
-        self.connection.send_line(build_set_throttle_max(value))
+        self.send_command(build_set_throttle_max(value))
 
     def set_brake_min(self, value: int) -> None:
-        self.connection.send_line(build_set_brake_min(value))
+        self.send_command(build_set_brake_min(value))
 
     def set_brake_max(self, value: int) -> None:
-        self.connection.send_line(build_set_brake_max(value))
+        self.send_command(build_set_brake_max(value))
 
     def set_clutch_min(self, value: int) -> None:
-        self.connection.send_line(build_set_clutch_min(value))
+        self.send_command(build_set_clutch_min(value))
 
     def set_clutch_max(self, value: int) -> None:
-        self.connection.send_line(build_set_clutch_max(value))
+        self.send_command(build_set_clutch_max(value))
 
     def set_invert_pedals(self, enabled: bool) -> None:
-        self.connection.send_line(build_set_invert_pedals(enabled))
+        self.send_command(build_set_invert_pedals(enabled))
 
     def set_ffb_enable(self, enabled: bool) -> None:
-        self.connection.send_line(build_enable_ffb(enabled))
+        self.send_command(build_enable_ffb(enabled))
 
     def save(self) -> None:
-        self.connection.send_line(build_save())
+        self.send_command(build_save())
 
     def load(self) -> None:
-        self.connection.send_line(build_load())
+        self.send_command(build_load())
 
     def reset_default(self) -> None:
-        self.connection.send_line(build_reset())
+        self.send_command(build_reset())
 
     def get_telemetry(self) -> DeviceTelemetry:
         return self.telemetry
