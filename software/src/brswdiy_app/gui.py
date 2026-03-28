@@ -352,8 +352,8 @@ class App(ctk.CTk):
         offset_slider = ctk.CTkSlider(
             section,
             from_=0,
-            to=15,
-            number_of_steps=15,
+            to=10,
+            number_of_steps=10,
             fg_color=BG_MAIN,
             progress_color=ACCENT,
             button_color=ACCENT,
@@ -656,7 +656,7 @@ class App(ctk.CTk):
         slider = getattr(self, f"{pedal_name}_offset_slider")
 
         current_raw = pedal_state.current
-        offset = int(slider.get() * 1023 / 100)
+        offset = int(slider.get() * pedal_state.maximum / 100)
 
         return current_raw, offset
 
