@@ -2,8 +2,6 @@
 #include <Arduino.h>
 
 #include "constants/protocol_constants.h"
-#include "proto/command_parser.h"
-#include "proto/response_stream.h"
 #include "proto/serial_protocol.h"
 #include "types/device_state.h"
 #include "types/telemetry_types.h"
