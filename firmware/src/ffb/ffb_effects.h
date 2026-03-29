@@ -22,6 +22,11 @@ bool ffb_update_effect_parameters(uint8_t effect_id,
                                   uint16_t duration_ms,
                                   int16_t direction,
                                   uint16_t start_delay_ms = 0);
+bool ffb_set_envelope(uint8_t effect_id,
+                      uint8_t attack_level,
+                      uint8_t fade_level,
+                      uint16_t attack_time_ms,
+                      uint16_t fade_time_ms);
 bool ffb_set_constant_force(uint8_t effect_id, int16_t magnitude, uint8_t gain_percent);
 bool ffb_set_periodic(uint8_t effect_id,
                       int16_t magnitude,

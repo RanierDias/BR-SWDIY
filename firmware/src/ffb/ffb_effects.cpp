@@ -1,12 +1,27 @@
 #include "ffb/ffb_effects.h"
 
 #include <Arduino.h>
-#include <math.h>
 
 namespace
 {
     constexpr uint8_t MAX_EFFECT_SLOTS = 8;
-    constexpr float PI_F = 3.14159265f;
+    static int16_t SINE_WAVE_TABLE[256] = {
+        0, 3, 6, 9, 12, 15, 18, 21, 24, 28, 31, 34, 37, 40, 43, 46,
+        48, 51, 54, 57, 60, 63, 65, 68, 71, 73, 76, 78, 81, 83, 85, 88,
+        90, 92, 94, 96, 98, 100, 102, 104, 106, 107, 109, 111, 112, 113, 115, 116,
+        117, 118, 120, 121, 122, 122, 123, 124, 125, 125, 126, 126, 126, 127, 127, 127,
+        127, 127, 127, 127, 126, 126, 126, 125, 125, 124, 123, 122, 122, 121, 120, 118,
+        117, 116, 115, 113, 112, 111, 109, 107, 106, 104, 102, 100, 98, 96, 94, 92,
+        90, 88, 85, 83, 81, 78, 76, 73, 71, 68, 65, 63, 60, 57, 54, 51,
+        48, 46, 43, 40, 37, 34, 31, 28, 24, 21, 18, 15, 12, 9, 6, 3,
+        0, -3, -6, -9, -12, -15, -18, -21, -24, -28, -31, -34, -37, -40, -43, -46,
+        -48, -51, -54, -57, -60, -63, -65, -68, -71, -73, -76, -78, -81, -83, -85, -88,
+        -90, -92, -94, -96, -98, -100, -102, -104, -106, -107, -109, -111, -112, -113, -115, -116,
+        -117, -118, -120, -121, -122, -122, -123, -124, -125, -125, -126, -126, -126, -127, -127, -127,
+        -127, -127, -127, -127, -126, -126, -126, -125, -125, -124, -123, -122, -122, -121, -120, -118,
+        -117, -116, -115, -113, -112, -111, -109, -107, -106, -104, -102, -100, -98, -96, -94, -92,
+        -90, -88, -85, -83, -81, -78, -76, -73, -71, -68, -65, -63, -60, -57, -54, -51,
+        -48, -46, -43, -40, -37, -34, -31, -28, -24, -21, -18, -15, -12, -9, -6, -3};
 
     FfbEffectSlot g_effect_slots[MAX_EFFECT_SLOTS];
     FfbDeviceState g_ffb_state;
@@ -39,6 +54,121 @@ namespace
         return static_cast<int16_t>((static_cast<int32_t>(value) * gain) / 100);
     }
 
+    int16_t apply_signed_friction(int16_t value,
+                                  int16_t deadband,
+                                  int16_t coefficient_positive,
+                                  int16_t coefficient_negative)
+    {
+        if (value > deadband)
+        {
+            return constrain(coefficient_positive, 0, 100);
+        }
+
+        if (value < -deadband)
+        {
+            return -constrain(coefficient_negative, 0, 100);
+        }
+
+        return 0;
+    }
+
+    int16_t sample_periodic_wave(const FfbPeriodic &periodic, uint32_t elapsed_ms)
+    {
+        const uint16_t period_ms = (periodic.period_ms == 0) ? 1 : periodic.period_ms;
+
+        const uint32_t elapsed_phase = (elapsed_ms % period_ms) * 8192UL / period_ms;
+        const uint32_t phase_offset = (static_cast<uint32_t>(periodic.phase % 36000U) * 8192UL) / 36000UL;
+        const uint16_t phase = static_cast<uint16_t>((elapsed_phase + phase_offset) & 0x1FFFU);
+
+        const uint8_t index = static_cast<uint8_t>(phase >> 5);
+        const uint8_t next_index = static_cast<uint8_t>((index + 1U) & 0xFFU);
+        const uint8_t fraction = static_cast<uint8_t>(phase & 0x1FU); // Resto de 5 bits (0-31)
+
+        const int16_t a = SINE_WAVE_TABLE[index];
+        const int16_t b = SINE_WAVE_TABLE[next_index];
+
+        const int16_t interpolated = static_cast<int16_t>(
+            a + ((static_cast<int32_t>(b - a) * fraction) >> 5));
+
+        return static_cast<int16_t>(
+            periodic.offset + ((static_cast<int32_t>(interpolated) * periodic.magnitude) / 127L));
+    }
+
+    int16_t apply_direction(int16_t value, int16_t direction)
+    {
+        constexpr int16_t DIRECTION_AXIS_DEADBAND_PERCENT = 6;
+
+        uint16_t normalized = static_cast<uint16_t>(direction);
+        if (normalized >= 36000U)
+        {
+            normalized %= 36000U;
+        }
+
+        int16_t axis_percent = 0;
+        if (normalized < 9000U)
+        {
+            axis_percent = static_cast<int16_t>(100 - ((static_cast<int32_t>(normalized) * 100L) / 9000L));
+        }
+        else if (normalized < 18000U)
+        {
+            axis_percent = static_cast<int16_t>(-((static_cast<int32_t>(normalized - 9000U) * 100L) / 9000L));
+        }
+        else if (normalized < 27000U)
+        {
+            axis_percent = static_cast<int16_t>(-100 + ((static_cast<int32_t>(normalized - 18000U) * 100L) / 9000L));
+        }
+        else
+        {
+            axis_percent = static_cast<int16_t>((static_cast<int32_t>(normalized - 27000U) * 100L) / 9000L);
+        }
+
+        if (abs(axis_percent) < DIRECTION_AXIS_DEADBAND_PERCENT)
+        {
+            return 0;
+        }
+
+        return static_cast<int16_t>((static_cast<int32_t>(value) * axis_percent) / 100L);
+    }
+
+    int16_t apply_envelope(const FfbEffectSlot &slot, int16_t value, uint32_t elapsed_ms)
+    {
+        if (!slot.envelope.enabled)
+        {
+            return value;
+        }
+
+        int16_t envelope_percent = 100;
+
+        if (slot.envelope.attack_time_ms > 0 && elapsed_ms < slot.envelope.attack_time_ms)
+        {
+            const int16_t attack_delta = static_cast<int16_t>(100 - slot.envelope.attack_level);
+            envelope_percent = static_cast<int16_t>(
+                slot.envelope.attack_level +
+                ((static_cast<int32_t>(attack_delta) * elapsed_ms) / slot.envelope.attack_time_ms));
+        }
+
+        if (slot.duration_ms > 0 && slot.envelope.fade_time_ms > 0 && elapsed_ms < slot.duration_ms)
+        {
+            const uint32_t fade_start_ms = (slot.duration_ms > slot.envelope.fade_time_ms)
+                                               ? (slot.duration_ms - slot.envelope.fade_time_ms)
+                                               : 0;
+            if (elapsed_ms >= fade_start_ms)
+            {
+                const uint32_t fade_elapsed_ms = elapsed_ms - fade_start_ms;
+                const int16_t fade_delta = static_cast<int16_t>(slot.envelope.fade_level - 100);
+                const int16_t fade_percent = static_cast<int16_t>(
+                    100 + ((static_cast<int32_t>(fade_delta) * fade_elapsed_ms) / slot.envelope.fade_time_ms));
+                if (fade_percent < envelope_percent)
+                {
+                    envelope_percent = fade_percent;
+                }
+            }
+        }
+
+        envelope_percent = constrain(envelope_percent, 0, 100);
+        return static_cast<int16_t>((static_cast<int32_t>(value) * envelope_percent) / 100L);
+    }
+
     bool is_effect_active(const FfbEffectSlot &slot, uint32_t now_ms)
     {
         if (!slot.allocated || !slot.enabled)
@@ -60,7 +190,12 @@ namespace
 
         const uint32_t elapsed_since_ready = now_ms - ready_time_ms;
 
-        if (slot.loop_count <= 1)
+        if (slot.loop_count == 0)
+        {
+            return true;
+        }
+
+        if (slot.loop_count == 1)
         {
             return elapsed_since_ready <= slot.duration_ms;
         }
@@ -247,6 +382,28 @@ bool ffb_set_constant_force(uint8_t effect_id, int16_t magnitude, uint8_t gain_p
     return true;
 }
 
+bool ffb_set_envelope(uint8_t effect_id,
+                      uint8_t attack_level,
+                      uint8_t fade_level,
+                      uint16_t attack_time_ms,
+                      uint16_t fade_time_ms)
+{
+    FfbEffectSlot *slot = find_slot(effect_id);
+
+    if (slot == nullptr)
+    {
+        return false;
+    }
+
+    slot->envelope.enabled = (attack_time_ms > 0 || fade_time_ms > 0 ||
+                              attack_level < 100 || fade_level < 100);
+    slot->envelope.attack_level = constrain(attack_level, 0, 100);
+    slot->envelope.fade_level = constrain(fade_level, 0, 100);
+    slot->envelope.attack_time_ms = attack_time_ms;
+    slot->envelope.fade_time_ms = fade_time_ms;
+    return true;
+}
+
 bool ffb_set_periodic(uint8_t effect_id,
                       int16_t magnitude,
                       uint16_t period_ms,
@@ -303,7 +460,10 @@ bool ffb_set_condition(uint8_t effect_id,
         return false;
     }
 
-    if (slot->type != FfbEffectType::Spring && slot->type != FfbEffectType::Damper)
+    if (slot->type != FfbEffectType::Spring &&
+        slot->type != FfbEffectType::Damper &&
+        slot->type != FfbEffectType::Friction &&
+        slot->type != FfbEffectType::Inertia)
     {
         return false;
     }
@@ -366,7 +526,7 @@ void ffb_start_effect(uint8_t effect_id, uint32_t now_ms, uint8_t loop_count)
     {
         slot->enabled = true;
         slot->start_time_ms = now_ms;
-        slot->loop_count = (loop_count == 0) ? 1 : loop_count;
+        slot->loop_count = loop_count;
     }
 }
 
@@ -460,7 +620,7 @@ int16_t ffb_compute_base_force(const WheelInputState &input)
     }
 
     const uint32_t now_ms = input.sample_time_us / 1000UL;
-    int16_t total_force = 0;
+    int32_t total_force_accumulator = 0;
 
     for (uint8_t i = 0; i < MAX_EFFECT_SLOTS; ++i)
     {
@@ -471,54 +631,67 @@ int16_t ffb_compute_base_force(const WheelInputState &input)
             continue;
         }
 
+        int16_t effect_force = 0;
+        const uint32_t elapsed_ms = effect_elapsed_ms(slot, now_ms);
+
         if (slot.type == FfbEffectType::ConstantForce)
         {
-            total_force += apply_gain(slot.magnitude, slot.gain);
-        }
-        else if (slot.type == FfbEffectType::Spring)
-        {
-            const int16_t displacement = input.angle - slot.condition.center;
-            const int16_t spring_force = -apply_signed_condition(displacement,
-                                                                 slot.condition.deadband,
-                                                                 slot.condition.coefficient_positive,
-                                                                 slot.condition.coefficient_negative);
-            total_force += apply_gain(spring_force, slot.gain);
-        }
-        else if (slot.type == FfbEffectType::Damper)
-        {
-            const int16_t damper_force = -apply_signed_condition(input.angular_velocity,
-                                                                 slot.condition.deadband,
-                                                                 slot.condition.coefficient_positive,
-                                                                 slot.condition.coefficient_negative);
-            total_force += apply_gain(damper_force, slot.gain);
+            int16_t base = apply_envelope(slot, slot.magnitude, elapsed_ms);
+            effect_force = apply_direction(base, slot.direction);
         }
         else if (slot.type == FfbEffectType::Sine)
         {
-            const uint32_t elapsed_ms = effect_elapsed_ms(slot, now_ms);
-            const float phase = ((2.0f * PI_F * elapsed_ms) / slot.periodic.period_ms) +
-                                ((2.0f * PI_F * slot.periodic.phase) / 360.0f);
-            const int16_t periodic_force = static_cast<int16_t>(
-                slot.periodic.offset + (sinf(phase) * slot.periodic.magnitude));
-            total_force += apply_gain(constrain(periodic_force, -100, 100), slot.gain);
+            int16_t periodic = sample_periodic_wave(slot.periodic, elapsed_ms);
+            int16_t shaped = apply_envelope(slot, periodic, elapsed_ms);
+            effect_force = apply_direction(shaped, slot.direction);
         }
         else if (slot.type == FfbEffectType::Ramp)
         {
-            if (slot.duration_ms == 0)
+            int16_t ramp_raw = slot.ramp_start;
+            if (slot.duration_ms > 0)
             {
-                total_force += apply_gain(slot.ramp_end, slot.gain);
-                continue;
+                int32_t delta = static_cast<int32_t>(slot.ramp_end) - slot.ramp_start;
+                ramp_raw += static_cast<int16_t>((delta * static_cast<int32_t>(elapsed_ms)) / slot.duration_ms);
             }
-
-            const uint32_t elapsed_ms = effect_elapsed_ms(slot, now_ms);
-            const int32_t delta = static_cast<int32_t>(slot.ramp_end) - slot.ramp_start;
-            const int16_t ramp_force = static_cast<int16_t>(
-                slot.ramp_start + ((delta * static_cast<int32_t>(elapsed_ms)) / slot.duration_ms));
-            total_force += apply_gain(constrain(ramp_force, -100, 100), slot.gain);
+            int16_t shaped = apply_envelope(slot, constrain(ramp_raw, -100, 100), elapsed_ms);
+            effect_force = apply_direction(shaped, slot.direction);
         }
+
+        else if (slot.type == FfbEffectType::Spring)
+        {
+            const int16_t displacement = input.angle - slot.condition.center;
+            effect_force = -apply_signed_condition(displacement,
+                                                   slot.condition.deadband,
+                                                   slot.condition.coefficient_positive,
+                                                   slot.condition.coefficient_negative);
+        }
+        else if (slot.type == FfbEffectType::Damper)
+        {
+            effect_force = -apply_signed_condition(input.angular_velocity,
+                                                   slot.condition.deadband,
+                                                   slot.condition.coefficient_positive,
+                                                   slot.condition.coefficient_negative);
+        }
+        else if (slot.type == FfbEffectType::Friction)
+        {
+            effect_force = -apply_signed_friction(input.angular_velocity,
+                                                  slot.condition.deadband,
+                                                  slot.condition.coefficient_positive,
+                                                  slot.condition.coefficient_negative);
+        }
+        else if (slot.type == FfbEffectType::Inertia)
+        {
+            effect_force = -apply_signed_condition(input.angular_acceleration,
+                                                   slot.condition.deadband,
+                                                   slot.condition.coefficient_positive,
+                                                   slot.condition.coefficient_negative);
+        }
+
+        total_force_accumulator += apply_gain(effect_force, slot.gain);
     }
 
-    total_force = static_cast<int16_t>(
-        (static_cast<int32_t>(total_force) * g_ffb_state.device_gain) / 100);
+    int16_t final_force = static_cast<int16_t>(
+        (total_force_accumulator * g_ffb_state.device_gain) / 100);
 
-    return constrain(total_force, -100, 100);
+    return constrain(final_force, -100, 100);
 }

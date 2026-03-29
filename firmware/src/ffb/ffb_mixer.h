@@ -6,5 +6,4 @@
 #include "types/control_types.h"
 
 MotorCommand ffb_mix_motor_command(const WheelInputState &input,
-                                   const DeviceConfig &config,
-                                   int8_t manual_output_percent);
+                                   const DeviceConfig &config);

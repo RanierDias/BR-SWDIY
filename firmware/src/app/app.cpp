@@ -22,18 +22,23 @@ static DeviceConfig g_config;
 static DeviceStatus g_status;
 static InputCalibration g_input_calibration;
 static int16_t g_encoder_zero_offset = 0;
-static uint32_t g_last_fast_update = 0;
 static uint32_t g_last_slow_update = 0;
 static uint16_t g_max_angle_counts = 0;
 static WheelInputState g_input_state;
 
 static constexpr int8_t LOCK_ZONE = 20;
+static constexpr int8_t LOCK_MIN_FORCE = 12;
+static constexpr int8_t LOCK_MAX_FORCE = 100;
 
 static void apply_default_config()
 {
   g_config.max_angle = 720;
   g_max_angle_counts = 2400;
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
+  g_config.damper = 6;
+  g_config.friction = 2;
+  g_config.inertia = 2;
+  g_config.spring = 0;
   g_config.output_limit = brswdiy::protocol::OUTPUT_LIMIT_DEFAULT;
   g_config.safe_start = true;
   g_config.watchdog_ms = brswdiy::protocol::WATCHDOG_DEFAULT_MS;
@@ -120,46 +125,65 @@ static int8_t apply_angle_limit(int8_t requested_output)
 {
   const int16_t current_angle = g_status.angle;
   const uint16_t threshold = (g_max_angle_counts - LOCK_ZONE) / 2;
-
-  uint16_t abs_angle = (current_angle < 0) ? -current_angle : current_angle;
+  const uint16_t abs_angle = (current_angle < 0) ? -current_angle : current_angle;
 
   if (abs_angle < threshold)
   {
     return requested_output;
   }
 
-  int16_t distance = abs_angle - threshold;
+  const int16_t distance = abs_angle - threshold;
+  const int16_t lock_range = g_max_angle_counts > threshold ? (g_max_angle_counts - threshold) : 1;
+  int16_t scaled_strength = LOCK_MIN_FORCE +
+                            ((static_cast<int32_t>(distance) * (LOCK_MAX_FORCE - LOCK_MIN_FORCE)) / lock_range);
 
-  if (distance > LOCK_ZONE)
-    distance = LOCK_ZONE;
+  if (scaled_strength > LOCK_MAX_FORCE)
+  {
+    scaled_strength = LOCK_MAX_FORCE;
+  }
 
-  int8_t lock_strength = (int8_t)(distance << 1);
+  const int8_t lock_force = (current_angle > 0)
+                                ? static_cast<int8_t>(scaled_strength)
+                                : static_cast<int8_t>(-scaled_strength);
 
-  return (current_angle > 0) ? -lock_strength : lock_strength;
+  // Preserve game FFB while preventing any torque that keeps pushing outward.
+  if ((requested_output > 0 && lock_force > 0) || (requested_output < 0 && lock_force < 0))
+  {
+    const int16_t combined = static_cast<int16_t>(requested_output) + lock_force / 2;
+    return constrain(combined, -g_config.output_limit, g_config.output_limit);
+  }
+
+  const int16_t corrected = static_cast<int16_t>(requested_output) + lock_force;
+  if ((corrected > 0 && lock_force < 0) || (corrected < 0 && lock_force > 0))
+  {
+    return 0;
+  }
+
+  return constrain(corrected, -g_config.output_limit, g_config.output_limit);
 }
 
 static void refresh_control_state(uint32_t now_us)
 {
-  g_input_state = control_build_input_state(g_status.angle,
-                                            g_status.throttle,
-                                            g_status.brake,
-                                            g_status.clutch,
-                                            g_status.buttons,
-                                            now_us);
+  g_input_state = control_build_input_state(
+      g_status.angle,
+      g_status.throttle,
+      g_status.brake,
+      g_status.clutch,
+      g_status.buttons,
+      now_us);
   usb_wheel_set_input_state(g_input_state);
 }
 
 static void update_motor_output()
 {
   const uint32_t now_ms = millis();
-  const int8_t manual_output = control_get_manual_output(now_ms);
-
-  MotorCommand command = ffb_mix_motor_command(g_input_state, g_config, manual_output);
-  command = safety_apply_motor_rules(command,
-                                     g_config,
-                                     ffb_get_device_state(),
-                                     g_status.motor_enabled,
-                                     now_ms);
+  MotorCommand command = ffb_mix_motor_command(g_input_state, g_config);
+  command = safety_apply_motor_rules(
+      command,
+      g_config,
+      ffb_get_device_state(),
+      g_status.motor_enabled,
+      now_ms);
   command.output_percent = apply_angle_limit(command.output_percent);
   command.output_percent = constrain(command.output_percent, -g_config.output_limit, g_config.output_limit);
 
@@ -193,21 +217,15 @@ void update_app()
 {
   const uint32_t now = micros();
 
-  if ((now - g_last_fast_update) >= 1000)
-  {
-    g_last_fast_update = now;
-
-    update_encoder();
-    refresh_control_state(now);
-    update_motor_output();
-  }
+  update_encoder();
+  refresh_control_state(now);
+  update_motor_output();
 
   if ((now - g_last_slow_update) >= 5000)
   {
     g_last_slow_update = now;
 
     update_pedals();
-    refresh_control_state(now);
     update_usb_wheel();
     process_serial_protocol();
   }
@@ -420,15 +438,6 @@ bool set_clutch_min(int value)
 bool set_pedal_invert(bool enable)
 {
   g_input_calibration.invert_pedals = enable;
-  return true;
-}
-
-bool set_output(int value)
-{
-  if (value < -100 || value > 100)
-    return false;
-
-  control_set_manual_output((int8_t)value, millis());
   return true;
 }
 

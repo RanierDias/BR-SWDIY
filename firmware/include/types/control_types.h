@@ -6,6 +6,7 @@ struct WheelInputState
 {
     int16_t angle = 0;
     int16_t angular_velocity = 0;
+    int16_t angular_acceleration = 0;
     uint16_t throttle = 0;
     uint16_t brake = 0;
     uint16_t clutch = 0;

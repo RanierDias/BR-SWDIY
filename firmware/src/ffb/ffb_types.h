@@ -30,6 +30,15 @@ struct FfbPeriodic
     int16_t offset = 0;
 };
 
+struct FfbEnvelope
+{
+    bool enabled = false;
+    uint8_t attack_level = 100;
+    uint8_t fade_level = 100;
+    uint16_t attack_time_ms = 0;
+    uint16_t fade_time_ms = 0;
+};
+
 struct FfbEffectSlot
 {
     uint8_t effect_id = 0;
@@ -47,4 +56,5 @@ struct FfbEffectSlot
     uint32_t start_time_ms = 0;
     FfbCondition condition;
     FfbPeriodic periodic;
+    FfbEnvelope envelope;
 };

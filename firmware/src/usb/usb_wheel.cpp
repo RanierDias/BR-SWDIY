@@ -42,8 +42,8 @@ namespace
     constexpr uint8_t EFFECT_OP_START_SOLO = 2;
     constexpr uint8_t EFFECT_OP_STOP = 3;
 
-    constexpr uint8_t DEVICE_CONTROL_ENABLE_ACTUATORS = 1;
-    constexpr uint8_t DEVICE_CONTROL_DISABLE_ACTUATORS = 2;
+    constexpr uint8_t DEVICE_CONTROL_DISABLE_ACTUATORS = 1;
+    constexpr uint8_t DEVICE_CONTROL_ENABLE_ACTUATORS = 2;
     constexpr uint8_t DEVICE_CONTROL_STOP_ALL_EFFECTS = 3;
     constexpr uint8_t DEVICE_CONTROL_DEVICE_RESET = 4;
     constexpr uint8_t DEVICE_CONTROL_DEVICE_PAUSE = 5;
@@ -209,7 +209,7 @@ namespace
     SentInputSnapshot g_last_input_snapshot;
     PidStatusPayload g_last_status_payload;
     BlockLoadFeatureReport g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
-    UsbPidDebugState g_debug_state;
+    UsbFfbRuntimeStatus g_runtime_status;
     uint32_t g_last_input_report_ms = 0;
     uint32_t g_last_status_report_ms = 0;
     bool g_usb_session_active = false;
@@ -236,11 +236,16 @@ namespace
         return (value > 100) ? 100 : value;
     }
 
+    uint8_t level8_to_percent(uint8_t value)
+    {
+        return static_cast<uint8_t>(constrain((static_cast<uint16_t>(value) * 100U) / 255U, 0U, 100U));
+    }
+
     uint8_t gain16_to_percent(int16_t gain)
     {
         if (gain <= 0)
         {
-            return 0;
+            return 100;
         }
 
         const int32_t scaled = (static_cast<int32_t>(gain) * 100L) / 32767L;
@@ -264,20 +269,14 @@ namespace
         return static_cast<uint16_t>(constrain(scaled, 0UL, max_output));
     }
 
-    int32_t get_configured_angle_counts()
-    {
-        const uint16_t max_angle_counts = get_max_angle() * 10 / 3;
-        if (max_angle_counts == 0)
-        {
-            return 1200;
-        }
-
-        return max_angle_counts;
-    }
-
     uint16_t steering_to_hid(int16_t angle)
     {
-        const int32_t max_counts = get_configured_angle_counts();
+        int32_t max_counts = static_cast<int32_t>(get_max_angle()) * 10L / 3L;
+        if (max_counts <= 0)
+        {
+            max_counts = 1200;
+        }
+
         const int32_t clamped_angle = constrain(static_cast<int32_t>(angle), -max_counts, max_counts);
         const int32_t shifted = clamped_angle + max_counts;
         const uint32_t full_scale = static_cast<uint32_t>(max_counts) * 2UL;
@@ -426,19 +425,6 @@ namespace
         return snapshot;
     }
 
-    void note_report(uint8_t report_id, uint8_t report_type, uint16_t len)
-    {
-        g_debug_state.last_report_id = report_id;
-        g_debug_state.last_report_type = report_type;
-        g_debug_state.last_report_length = len;
-    }
-
-    void note_invalid_report(uint8_t report_id, uint8_t report_type, uint16_t len)
-    {
-        ++g_debug_state.invalid_report_count;
-        note_report(report_id, report_type, len);
-    }
-
     void reset_usb_session_state()
     {
         g_usb_session_active = false;
@@ -461,7 +447,6 @@ namespace
         }
 
         HID_SendReport(PID_STATE_REPORT_ID, &payload, sizeof(payload));
-        ++g_debug_state.input_reports_sent;
         g_last_status_payload = payload;
         g_last_status_report_ms = now_ms;
     }
@@ -481,8 +466,6 @@ namespace
                                         snapshot.clutch,
                                         snapshot.aux_axis,
                                         snapshot.buttons);
-
-        ++g_debug_state.input_reports_sent;
         g_last_input_snapshot = snapshot;
         g_last_input_report_ms = now_ms;
     }
@@ -508,15 +491,13 @@ namespace
 
     void handle_device_control(uint8_t command, uint32_t now_ms)
     {
-        g_debug_state.last_operation = command;
-
-        if (command == DEVICE_CONTROL_ENABLE_ACTUATORS || command == 0x01)
+        if (command == DEVICE_CONTROL_ENABLE_ACTUATORS)
         {
             ffb_set_enabled(true, now_ms);
             return;
         }
 
-        if (command == DEVICE_CONTROL_DISABLE_ACTUATORS || command == 0x02)
+        if (command == DEVICE_CONTROL_DISABLE_ACTUATORS)
         {
             ffb_set_enabled(false, now_ms);
             return;
@@ -528,32 +509,24 @@ namespace
             return;
         }
 
-        if (command == DEVICE_CONTROL_DEVICE_RESET || command == 0x08)
+        if (command == DEVICE_CONTROL_DEVICE_RESET || command == 0x04)
         {
             ffb_clear_all_effects();
             ffb_set_enabled(false, now_ms);
             return;
         }
 
-        if (command == DEVICE_CONTROL_DEVICE_PAUSE || command == 0x10)
+        if (command == DEVICE_CONTROL_DEVICE_PAUSE || command == 0x05)
         {
             ffb_set_enabled(false, now_ms);
             return;
         }
 
-        if (command == DEVICE_CONTROL_DEVICE_CONTINUE || command == 0x20)
+        if (command == DEVICE_CONTROL_DEVICE_CONTINUE || command == 0x06)
         {
             ffb_set_enabled(true, now_ms);
             return;
         }
-
-        if (command == 0x04)
-        {
-            ffb_clear_all_effects();
-            return;
-        }
-
-        ++g_debug_state.invalid_report_count;
     }
 
     void handle_set_effect(const SetEffectOutputReport &report)
@@ -561,32 +534,34 @@ namespace
         const FfbEffectType effect_type = decode_effect_type(report.effect_type);
         if (!is_valid_effect_id(report.effect_block_index) || effect_type == FfbEffectType::None)
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
-        const uint8_t gain_percent = gain16_to_percent(report.gain);
+        uint8_t gain_percent = gain16_to_percent(report.gain);
+        FfbEffectSlot existing_slot;
+        if (report.gain <= 0 && ffb_get_effect_slot(report.effect_block_index, existing_slot))
+        {
+            gain_percent = existing_slot.gain;
+        }
+
         ffb_prepare_effect(report.effect_block_index, effect_type, gain_percent);
         ffb_update_effect_parameters(report.effect_block_index,
                                      gain_percent,
                                      report.duration,
                                      static_cast<int16_t>(report.direction),
                                      report.start_delay);
-        g_debug_state.last_effect_id = report.effect_block_index;
     }
 
     void handle_set_condition(const SetConditionOutputReport &report)
     {
         if (!is_valid_effect_id(report.effect_block_index))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
         FfbEffectSlot slot;
         if (!ffb_get_effect_slot(report.effect_block_index, slot))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
@@ -606,15 +581,26 @@ namespace
             ffb_set_condition(report.effect_block_index, center, deadband, coefficient, coefficient, slot.gain);
             break;
         }
+    }
 
-        g_debug_state.last_effect_id = report.effect_block_index;
+    void handle_set_envelope(const SetEnvelopeOutputReport &report)
+    {
+        if (!is_valid_effect_id(report.effect_block_index))
+        {
+            return;
+        }
+
+        ffb_set_envelope(report.effect_block_index,
+                         level8_to_percent(report.attack_level),
+                         level8_to_percent(report.fade_level),
+                         report.attack_time,
+                         report.fade_time);
     }
 
     void handle_set_periodic(const SetPeriodicOutputReport &report)
     {
         if (!is_valid_effect_id(report.effect_block_index))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
@@ -631,14 +617,12 @@ namespace
                          static_cast<uint16_t>(report.phase) * 141U,
                          signed16_to_percent_force(report.offset),
                          gain_percent);
-        g_debug_state.last_effect_id = report.effect_block_index;
     }
 
     void handle_set_constant_force(const SetConstantForceOutputReport &report)
     {
         if (!is_valid_effect_id(report.effect_block_index))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
@@ -652,14 +636,12 @@ namespace
         ffb_set_constant_force(report.effect_block_index,
                                signed16_to_percent_force(report.magnitude),
                                gain_percent);
-        g_debug_state.last_effect_id = report.effect_block_index;
     }
 
     void handle_set_ramp_force(const SetRampForceOutputReport &report)
     {
         if (!is_valid_effect_id(report.effect_block_index))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
 
@@ -671,26 +653,29 @@ namespace
         }
 
         ffb_set_ramp(report.effect_block_index, report.ramp_start, report.ramp_end, gain_percent);
-        g_debug_state.last_effect_id = report.effect_block_index;
     }
 
     void handle_effect_operation(const EffectOperationOutputReport &report, uint32_t now_ms)
     {
         if (!is_valid_effect_id(report.effect_block_index))
         {
-            note_invalid_report(report.report_id, HID_REPORT_TYPE_OUTPUT, sizeof(report));
             return;
         }
-
-        g_debug_state.last_effect_id = report.effect_block_index;
-        g_debug_state.last_operation = report.operation;
 
         switch (report.operation)
         {
         case EFFECT_OP_START:
+            if (!ffb_is_enabled())
+            {
+                ffb_set_enabled(true, now_ms);
+            }
             ffb_start_effect(report.effect_block_index, now_ms, report.loop_count == 0 ? 1 : report.loop_count);
             break;
         case EFFECT_OP_START_SOLO:
+            if (!ffb_is_enabled())
+            {
+                ffb_set_enabled(true, now_ms);
+            }
             stop_other_effects(report.effect_block_index);
             ffb_start_effect(report.effect_block_index, now_ms, report.loop_count == 0 ? 1 : report.loop_count);
             break;
@@ -698,7 +683,6 @@ namespace
             ffb_stop_effect(report.effect_block_index);
             break;
         default:
-            ++g_debug_state.invalid_report_count;
             break;
         }
     }
@@ -707,13 +691,12 @@ namespace
     {
         if (len == 0)
         {
-            note_invalid_report(0, HID_REPORT_TYPE_OUTPUT, 0);
             return;
         }
 
         const uint8_t report_id = data[0];
-        note_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
-        ++g_debug_state.output_report_count;
+        ++g_runtime_status.output_report_count;
+        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         switch (report_id)
@@ -723,24 +706,26 @@ namespace
             const auto *report = as_report<SetEffectOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_set_effect(*report);
             break;
         }
         case PID_SET_ENVELOPE_REPORT_ID:
-            if (!report_has_length<SetEnvelopeOutputReport>(len))
+        {
+            const auto *report = as_report<SetEnvelopeOutputReport>(data, len);
+            if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
+                return;
             }
+            handle_set_envelope(*report);
             break;
+        }
         case PID_SET_CONDITION_REPORT_ID:
         {
             const auto *report = as_report<SetConditionOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_set_condition(*report);
@@ -751,7 +736,6 @@ namespace
             const auto *report = as_report<SetPeriodicOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_set_periodic(*report);
@@ -762,7 +746,6 @@ namespace
             const auto *report = as_report<SetConstantForceOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_set_constant_force(*report);
@@ -773,7 +756,6 @@ namespace
             const auto *report = as_report<SetRampForceOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_set_ramp_force(*report);
@@ -784,7 +766,6 @@ namespace
             const auto *report = as_report<EffectOperationOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_effect_operation(*report, millis());
@@ -795,11 +776,9 @@ namespace
             const auto *report = as_report<BlockFreeOutputReport>(data, len);
             if (!report || !is_valid_effect_id(report->effect_block_index))
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             ffb_clear_effect(report->effect_block_index);
-            g_debug_state.last_effect_id = report->effect_block_index;
             break;
         }
         case PID_DEVICE_CONTROL_REPORT_ID:
@@ -807,7 +786,6 @@ namespace
             const auto *report = as_report<DeviceControlOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             handle_device_control(report->control, millis());
@@ -818,14 +796,12 @@ namespace
             const auto *report = as_report<DeviceGainOutputReport>(data, len);
             if (!report)
             {
-                note_invalid_report(report_id, HID_REPORT_TYPE_OUTPUT, len);
                 return;
             }
             ffb_set_device_gain(clamp_percent_from_u8(static_cast<uint8_t>((static_cast<uint16_t>(report->device_gain) * 100U) / 255U)), millis());
             break;
         }
         default:
-            ++g_debug_state.invalid_report_count;
             break;
         }
     }
@@ -837,9 +813,8 @@ namespace
 
     bool handle_feature_get_report(uint8_t report_id)
     {
-        ++g_debug_state.get_report_count;
-        ++g_debug_state.feature_report_count;
-        note_report(report_id, HID_REPORT_TYPE_FEATURE, 0);
+        ++g_runtime_status.feature_report_count;
+        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         if (report_id == PID_BLOCK_LOAD_REPORT_ID)
@@ -864,9 +839,8 @@ namespace
 
     bool handle_feature_set_report(uint8_t report_id)
     {
-        ++g_debug_state.set_report_count;
-        ++g_debug_state.feature_report_count;
-        note_report(report_id, HID_REPORT_TYPE_FEATURE, 0);
+        ++g_runtime_status.feature_report_count;
+        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         if (report_id != PID_CREATE_NEW_EFFECT_REPORT_ID)
@@ -876,13 +850,11 @@ namespace
 
         CreateNewEffectFeatureReport report{};
         USB_RecvControl(&report, sizeof(report));
-        note_report(report.report_id, HID_REPORT_TYPE_FEATURE, sizeof(report));
 
         const FfbEffectType effect_type = decode_effect_type(report.effect_type);
         if (effect_type == FfbEffectType::None)
         {
             prepare_block_load_report(0, BLOCK_LOAD_ERROR);
-            ++g_debug_state.invalid_report_count;
             return true;
         }
 
@@ -896,12 +868,10 @@ namespace
         if (!ffb_prepare_effect(effect_id, effect_type, 100))
         {
             prepare_block_load_report(0, BLOCK_LOAD_ERROR);
-            ++g_debug_state.invalid_report_count;
             return true;
         }
 
         prepare_block_load_report(effect_id, BLOCK_LOAD_SUCCESS);
-        g_debug_state.last_effect_id = effect_id;
         return true;
     }
 
@@ -936,8 +906,6 @@ namespace
                 {
                     return handle_feature_set_report(report_id);
                 }
-                ++g_debug_state.set_report_count;
-                note_report(report_id, report_type, setup.wLength);
                 return true;
             default:
                 break;
@@ -959,7 +927,7 @@ void setup_usb_wheel()
     g_last_input_snapshot = SentInputSnapshot{};
     g_last_status_payload = PidStatusPayload{};
     g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
-    usb_wheel_reset_debug_state();
+    g_runtime_status = UsbFfbRuntimeStatus{};
 
     USBDevice.HID_Setup_Callback = usb_hid_setup;
     USBDevice.HID_ReceiveReport_Callback = usb_hid_receive_report;
@@ -1001,19 +969,9 @@ void usb_wheel_set_input_state(const WheelInputState &state)
     g_input_state = state;
 }
 
-uint16_t usb_wheel_get_steering_hid_value(int16_t angle_counts)
+const UsbFfbRuntimeStatus &usb_wheel_get_runtime_status()
 {
-    return steering_to_hid(angle_counts);
-}
-
-const UsbPidDebugState &usb_wheel_get_debug_state()
-{
-    return g_debug_state;
-}
-
-void usb_wheel_reset_debug_state()
-{
-    g_debug_state = UsbPidDebugState{};
+    return g_runtime_status;
 }
 
 #else
@@ -1035,19 +993,10 @@ void usb_wheel_set_input_state(const WheelInputState &)
 {
 }
 
-uint16_t usb_wheel_get_steering_hid_value(int16_t)
+const UsbFfbRuntimeStatus &usb_wheel_get_runtime_status()
 {
-    return 0;
-}
-
-const UsbPidDebugState &usb_wheel_get_debug_state()
-{
-    static UsbPidDebugState state;
-    return state;
-}
-
-void usb_wheel_reset_debug_state()
-{
+    static UsbFfbRuntimeStatus status;
+    return status;
 }
 
 #endif
