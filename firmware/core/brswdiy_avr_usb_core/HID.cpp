@@ -137,8 +137,8 @@ const u8 _hidReportDescriptor[] =
   0x09, 0x30,          // USAGE (x)
   //0x16, X_AXIS_LOG_MIN & 0xFF, (X_AXIS_LOG_MIN >> 8) & 0xFF, // LOGICAL_MINIMUM // milos, old
   //0x27, X_AXIS_LOG_MAX & 0xFF, (X_AXIS_LOG_MAX >> 8) & 0xFF, 0, 0, // LOGICAL_MAXIMUM // milos, old
-  0x17, X_AXIS_LOG_MIN & 0xFF, (X_AXIS_LOG_MIN >> 8) & 0xFF, (X_AXIS_LOG_MIN >> 16) & 0xFF, (X_AXIS_LOG_MIN >> 24) & 0xFF, // LOGICAL_MINIMUM // milos, new 32bit
-  0x27, X_AXIS_LOG_MAX & 0xFF, (X_AXIS_LOG_MAX >> 8) & 0xFF, (X_AXIS_LOG_MAX >> 16) & 0xFF, (X_AXIS_LOG_MAX >> 24) & 0xFF, // LOGICAL_MAXIMUM // milos, new 32bit
+  0x17, ((uint32_t)X_AXIS_LOG_MIN) & 0xFF, (((uint32_t)X_AXIS_LOG_MIN) >> 8) & 0xFF, (((uint32_t)X_AXIS_LOG_MIN) >> 16) & 0xFF, (((uint32_t)X_AXIS_LOG_MIN) >> 24) & 0xFF, // LOGICAL_MINIMUM // milos, new 32bit
+  0x27, ((uint32_t)X_AXIS_LOG_MAX) & 0xFF, (((uint32_t)X_AXIS_LOG_MAX) >> 8) & 0xFF, (((uint32_t)X_AXIS_LOG_MAX) >> 16) & 0xFF, (((uint32_t)X_AXIS_LOG_MAX) >> 24) & 0xFF, // LOGICAL_MAXIMUM // milos, new 32bit
   0x35, 0x00,         // PHYSICAL_MINIMUM (00)
   0x47, X_AXIS_PHYS_MAX & 0xFF, (X_AXIS_PHYS_MAX >> 8) & 0xFF, (X_AXIS_PHYS_MAX >> 16) & 0xFF, (X_AXIS_PHYS_MAX >> 24) & 0xFF, // PHYSICAL_MAXIMUM (0xffff) // milos, new 32bits
   0x75, X_AXIS_NB_BITS,   // REPORT_SIZE (AXIS_NB_BITS)
@@ -341,7 +341,7 @@ const u8 _hidReportDescriptor[] =
   0xA1, 0x02,	// COLLECTION (Logical)
   0x05, 0x01,	// USAGE_PAGE (Generic Desktop)
   0x09, 0x30,	// USAGE (X)
-#ifdef NB_FF_AXIS>1
+#if NB_FF_AXIS > 1
   0x09, 0x31,	// USAGE (Y)
 #endif
   0x15, 0x00,	// LOGICAL_MINIMUM (00)
@@ -1021,7 +1021,7 @@ void Joystick_::send_16_12_12(int16_t x, uint16_t y, uint16_t z, uint8_t buttons
   j[0] = x;
   j[1] = x >> 8;
   j[2] = y;
-  j[3] = (y >> 8) & 0xf | ((z & 0xf) << 4);
+  j[3] = ((y >> 8) & 0xf) | ((z & 0xf) << 4);
   j[4] = z >> 4;
   j[5] = buttons;
 
@@ -1037,7 +1037,7 @@ void Joystick_::send_16_16_12(int16_t x, uint16_t y, uint16_t z, uint16_t button
   j[2] = y;
   j[3] = y >> 8;
   j[4] = z;
-  j[5] = (z >> 8) & 0xf | ((buttons & 0xf) << 4);
+  j[5] = ((z >> 8) & 0xf) | ((buttons & 0xf) << 4);
   j[6] = buttons >> 4;
 
   HID_SendReport(4, j, 7);
@@ -1050,10 +1050,10 @@ void Joystick_::send_16_12_12_12(int16_t x, uint16_t y, uint16_t z, uint16_t rx,
   j[0] = x;						//8B
   j[1] = x >> 8;					//8B
   j[2] = y;						//8B
-  j[3] = (y >> 8) & 0xf | ((z & 0xf) << 4);
+  j[3] = ((y >> 8) & 0xf) | ((z & 0xf) << 4);
   j[4] = (z >> 4);					//8B
   j[5] = rx;						//8B
-  j[6] = (rx >> 8) & 0xf | ((buttons & 0xf) << 4);
+  j[6] = ((rx >> 8) & 0xf) | ((buttons & 0xf) << 4);
   j[7] = buttons >> 8 | 0x00;			//
 
   HID_SendReport(4, j, 8);
@@ -1103,7 +1103,7 @@ void Joystick_::send_16_16_12_12_32(int16_t x, uint16_t y, uint16_t z, uint16_t 
   j[2] = y;
   j[3] = y >> 8;
   j[4] = z;
-  j[5] = (z >> 8) & 0xf | ((rx & 0xf) << 4);
+  j[5] = ((z >> 8) & 0xf) | ((rx & 0xf) << 4);
   j[6] = rx >> 4;
   j[7] = buttons;
   j[8] = buttons >> 8;
@@ -1123,10 +1123,10 @@ void Joystick_::send_16_16_12_12_12_28(uint16_t x, uint16_t y, uint16_t z, uint1
   j[2] = y;
   j[3] = y >> 8;
   j[4] = z;
-  j[5] = (z >> 8) & 0xf | ((rx & 0xf) << 4);
+  j[5] = ((z >> 8) & 0xf) | ((rx & 0xf) << 4);
   j[6] = rx >> 4;
   j[7] = ry;
-  j[8] = (ry >> 8) & 0xf | ((buttons & 0xf) << 4);
+  j[8] = ((ry >> 8) & 0xf) | ((buttons & 0xf) << 4);
   j[9] = buttons >> 4;
   j[10] = buttons >> 12;
   j[11] = buttons >> 20;
@@ -1144,10 +1144,10 @@ void Joystick_::send_16_16_12_12_12_12_32(int16_t x, uint16_t y, uint16_t z, uin
   j[2] = y;
   j[3] = y >> 8;
   j[4] = z;
-  j[5] = (z >> 8) & 0xf | ((rx & 0xf) << 4);
+  j[5] = ((z >> 8) & 0xf) | ((rx & 0xf) << 4);
   j[6] = rx >> 4;
   j[7] = ry;
-  j[8] = (ry >> 8) & 0xf | ((rz & 0xf) << 4);
+  j[8] = ((ry >> 8) & 0xf) | ((rz & 0xf) << 4);
   j[9] = rz >> 4;
   j[10] = buttons;
   j[11] = buttons >> 8;
