@@ -2,32 +2,37 @@
 #include <Arduino.h>
 
 #include "constants/protocol_constants.h"
+#include "control/control_loop.h"
+#include "ffb/ffb_effects.h"
+#include "ffb/ffb_mixer.h"
 #include "proto/serial_protocol.h"
+#include "safety/safety_manager.h"
 #include "types/device_state.h"
 #include "types/telemetry_types.h"
+#include "types/control_types.h"
 #include "config/config_model.h"
 #include "config/calibration_model.h"
 #include "hw/pedals.h"
 #include "hw/encoder.h"
 #include "hw/motor.h"
 #include "hw/eeprom_store.h"
+#include "usb/usb_wheel.h"
 
 static DeviceConfig g_config;
 static DeviceStatus g_status;
 static InputCalibration g_input_calibration;
-static int8_t g_output = 0;
-static uint32_t g_last_output_ms = 0;
 static int16_t g_encoder_zero_offset = 0;
 static uint32_t g_last_fast_update = 0;
 static uint32_t g_last_slow_update = 0;
 static uint16_t g_max_angle_counts = 0;
+static WheelInputState g_input_state;
 
-static constexpr uint16_t LOCK_ZONE = 50;
+static constexpr int8_t LOCK_ZONE = 20;
 
 static void apply_default_config()
 {
-  g_config.max_angle = 360;
-  g_max_angle_counts = 1200;
+  g_config.max_angle = 720;
+  g_max_angle_counts = 2400;
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
   g_config.output_limit = brswdiy::protocol::OUTPUT_LIMIT_DEFAULT;
   g_config.safe_start = true;
@@ -114,7 +119,7 @@ static void update_encoder()
 static int8_t apply_angle_limit(int8_t requested_output)
 {
   const int16_t current_angle = g_status.angle;
-  const uint16_t threshold = g_max_angle_counts - LOCK_ZONE;
+  const uint16_t threshold = (g_max_angle_counts - LOCK_ZONE) / 2;
 
   uint16_t abs_angle = (current_angle < 0) ? -current_angle : current_angle;
 
@@ -133,18 +138,33 @@ static int8_t apply_angle_limit(int8_t requested_output)
   return (current_angle > 0) ? -lock_strength : lock_strength;
 }
 
+static void refresh_control_state(uint32_t now_us)
+{
+  g_input_state = control_build_input_state(g_status.angle,
+                                            g_status.throttle,
+                                            g_status.brake,
+                                            g_status.clutch,
+                                            g_status.buttons,
+                                            now_us);
+  usb_wheel_set_input_state(g_input_state);
+}
+
 static void update_motor_output()
 {
-  if (!g_status.motor_enabled)
-    return;
+  const uint32_t now_ms = millis();
+  const int8_t manual_output = control_get_manual_output(now_ms);
 
-  int8_t output = (millis() - g_last_output_ms <= 250) ? g_output : 0;
+  MotorCommand command = ffb_mix_motor_command(g_input_state, g_config, manual_output);
+  command = safety_apply_motor_rules(command,
+                                     g_config,
+                                     ffb_get_device_state(),
+                                     g_status.motor_enabled,
+                                     now_ms);
+  command.output_percent = apply_angle_limit(command.output_percent);
+  command.output_percent = constrain(command.output_percent, -g_config.output_limit, g_config.output_limit);
 
-  output = apply_angle_limit(output);
-  output = constrain(output, -g_config.output_limit, g_config.output_limit);
-
-  g_status.output = output;
-  set_motor_output(output);
+  g_status.output = command.output_percent;
+  set_motor_output(command.output_percent);
 }
 
 void setup_app()
@@ -153,6 +173,10 @@ void setup_app()
   setup_pedals();
   setup_encoder();
   setup_motor();
+  setup_control_loop();
+  setup_ffb_effects();
+  setup_safety_manager();
+  setup_usb_wheel();
 
   g_status.state = DeviceState::BOOT;
   apply_default_config();
@@ -174,6 +198,7 @@ void update_app()
     g_last_fast_update = now;
 
     update_encoder();
+    refresh_control_state(now);
     update_motor_output();
   }
 
@@ -182,6 +207,8 @@ void update_app()
     g_last_slow_update = now;
 
     update_pedals();
+    refresh_control_state(now);
+    update_usb_wheel();
     process_serial_protocol();
   }
 }
@@ -401,14 +428,14 @@ bool set_output(int value)
   if (value < -100 || value > 100)
     return false;
 
-  g_output = (int8_t)value;
-  g_last_output_ms = millis();
+  control_set_manual_output((int8_t)value, millis());
   return true;
 }
 
 bool handle_motor(bool enable)
 {
   g_status.motor_enabled = enable;
+  ffb_set_enabled(enable, millis());
 
   if (!enable)
   {

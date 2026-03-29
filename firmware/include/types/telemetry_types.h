@@ -8,7 +8,7 @@ struct DeviceStatus
     DeviceState state;
     int16_t angle = 0;
     int16_t center = 0;
-    uint8_t output = 0;
+    int8_t output = 0;
     uint8_t limit = 0;
     uint16_t throttle = 0;
     uint16_t brake = 0;
