@@ -1,89 +1,103 @@
-# BRSWDIY
+# BRSWDIY — Apus (Alpha)
 
-BRSWDIY é uma plataforma open source para bases de volante Force Feedback no Windows, com foco em estabilidade, baixo consumo de recursos e arquitetura modular.
+**Brasil Steering Wheel DIY**
 
-## Objetivo
+Uma implementação leve, eficiente e modular de volante com force feedback baseada em Arduino Leonardo, projetada para funcionar de forma simples, confiável e sem dependência de software em tempo real.
 
-Construir uma solução completa e limpa, composta por:
+## ✨ Visão Geral
 
-- firmware próprio para microcontroladores baseados em ATmega32u4
-- protocolo serial próprio para configuração e diagnóstico
-- aplicativo desktop em Python para Windows
-- documentação clara para hardware, software e evolução do projeto
+O **BRSWDIY** é um projeto que reimagina o conceito do Arduino FFB tradicional com foco em:
 
-## Escopo inicial
+- **Eficiência real de firmware**
+- **Baixo consumo de recursos**
+- **Arquitetura limpa e modular**
+- **Experiência plug-and-play**
 
-O MVP é centrado em uma base de 1 eixo com:
+Esta versão alfa, chamada **Apus**, marca o início de uma linha evolutiva onde cada versão derivada recebe o nome de uma constelação.
 
-- ATmega32u4 (Leonardo, Micro ou Pro Micro compatível)
-- driver BTS7960 / IBT-2
-- encoder incremental em quadratura
-- motor DC compatível com a faixa prática do BTS7960
-- USB HID + canal serial de configuração
+## 🎯 Objetivo
 
-## Princípios do projeto
+O objetivo do BRSWDIY é oferecer um sistema de volante com force feedback que:
 
-- firmware e interface são desacoplados
-- a GUI nunca acessa a serial diretamente
-- o protocolo define o contrato oficial entre firmware e aplicativo
-- segurança do motor tem prioridade sobre qualquer comando
-- recursos opcionais não bloqueiam o funcionamento do núcleo
-- o sistema deve nascer simples de depurar e evoluir
+- Funcione de forma **independente da interface gráfica**
+- Seja **leve o suficiente para rodar com estabilidade no Arduino Leonardo**
+- Permita **controle total via firmware e protocolo serial**
+- Seja **facilmente modificável e expansível** para outros projetos
 
-## Componentes principais
+## 🔌 Plug-and-Play de Verdade
 
-### `protocol/`
+Diferente de outras implementações:
 
-Documentação oficial do protocolo serial e regras de compatibilidade.
+> ⚡ O volante funciona completamente sem a GUI aberta.
 
-### `firmware/`
+- A GUI **não é necessária para uso**
+- O dispositivo se comporta como um **HID pronto para uso**
+- Valoriza os jogadores que estão começando no mundo competitivo
+- Respostas a 1ms com uma constância maior
 
-Firmware da base FFB, organizado por módulos de hardware, protocolo, controle e segurança.
+A interface **Apus Utility** existe apenas para:
 
-### `software/`
+- Ajustar ganho e limites
+- Configurar filtros
+- Calibrar inputs
+- Salvar configurações
 
-Aplicativo desktop em Python para configuração, diagnóstico, telemetria e perfis.
+## 🧠 Base do Projeto
 
-### `hardware/`
+O BRSWDIY é inspirado no projeto original:
 
-Referências de pinagem, diagramas e recursos opcionais.
+- Arduino-FFB-wheel (ranenbg)
 
-### `docs/`
+Mas foi reconstruído com foco em:
 
-Arquitetura, roadmap, decisões de projeto e documentação técnica de apoio.
+- Redução de overhead
+- Melhor controle de memória (RAM/Flash)
+- Organização de código orientada a sistemas mais fracos (Intel I3 13400F)
+- Independência de GUI
 
-## Requisitos de desenvolvimento
+## 🧩 Diagrama da versão Apus
 
-### Firmware
+- ### Diagrama do Encoder Optical
 
-- PlatformIO
-- C/C++
+  ![Optical Encoder Diagram](hardware/diagrams/optical-encoder.png "Diagrama para Optical Encoder")
 
-### Software
+- ### Diagrama do Motor Driver e Pedais
+  ![Motor Driver Diagram](hardware/diagrams/motor-driver-and-pedal.png "Diagrama para Motor Driver")
 
-- Python 3.11+
-- pyserial
-- DearPyGui ou PySide6
+## ⚙️ Características Principais
 
-## Segurança
+- ✔ Firmware otimizado para Arduino Leonardo suporta pilhas de reports (1Kb de RAM livre)
+- ✔ Comunicação serial própria (baixo overhead - 200hz)
+- ✔ Sistema de calibração por pedal
+- ✔ Estrutura preparada para filtros básicos
+- ✔ Watchdog configurável
+- ✔ Sem dependência de GUI em runtime
+- ✔ Uso direto como dispositivo HID
 
-Ao ligar:
+## 🧪 Status
 
-- o motor começa desabilitado
-- torque inicial é conservador
-- watchdog e limites de saída devem ser respeitados
-- o firmware pode negar comandos inseguros
+> 🚧 **Alpha — Apus**
 
-## Começando
+- Estrutura base funcional
+- Protocolo serial implementado
+- Sistema de inputs e outputs operacional
+- Interface inicial disponível (Apus Utility)
 
-### Protocolo
+Esta versão ainda está em evolução e sujeita a mudanças.
 
-Consulte `protocol/serial-v1.md`.
+## 🪐 Versionamento
 
-### Firmware
+Cada versão alternativa do BRSWDIY segue uma sequência baseada em constelações:
 
-Consulte `firmware/README.md`.
+- **Apus**: Leve e otimizada, focada em desempenhar com o mínimo possível viável no Arduino Leonardo.
 
-### Software
+A ideia é manter uma progressão clara de cada projeto, não mudando seu objetivo inicial.
 
-Consulte `software/README.md`.
+## 🙏 Créditos
+
+Este projeto só existe graças ao trabalho de base de:
+
+- Arduino-FFB-wheel — por ranenbg
+- FFB HID and USB core for Arduino — por Peter Barrett
+
+Vocês são demais, muito obrigado por fazerem esses projetos!!

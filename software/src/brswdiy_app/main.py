@@ -1,5 +1,10 @@
-from src.brswdiy_app.gui import App
+from brswdiy_app.gui import App
 
-if __name__ == "__main__":
+
+def main() -> None:
     app = App()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

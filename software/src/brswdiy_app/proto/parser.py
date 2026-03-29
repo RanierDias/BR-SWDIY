@@ -17,6 +17,11 @@ class CalibrationFrame:
     invert_pedals: bool
     motor_enable: bool
     output_limit: int
+    gain: int
+    damper: int
+    friction: int
+    inertia: int
+    spring: int
     throttle_min: int
     throttle_max: int
     brake_min: int
@@ -82,6 +87,11 @@ def parse_calibration(line: str) -> CalibrationFrame | None:
             max_angle=int(values["A"]),
             invert_pedals=values["I"] == "1",
             output_limit=int(values["O"]),
+            gain=int(values.get("G", "50")),
+            damper=int(values.get("D", "0")),
+            friction=int(values.get("F", "0")),
+            inertia=int(values.get("N", "0")),
+            spring=int(values.get("S", "0")),
             motor_enable=values["M"] == "1",
             throttle_min=int(values["TMN"]),
             throttle_max=int(values["TMX"]),

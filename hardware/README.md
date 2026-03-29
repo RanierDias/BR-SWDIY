@@ -6,7 +6,7 @@ Documentação de referência para a plataforma-base suportada pelo BRSWDIY.
 
 - ATmega32u4
 - BTS7960 / IBT-2
-- encoder incremental em quadratura
+- encoder incremental
 - 1 eixo FFB
 
 ## Observações

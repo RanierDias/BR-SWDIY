@@ -11,6 +11,11 @@ from brswdiy_app.proto.protocol import (
     build_enable_ffb,
     build_set_max_angle,
     build_set_output_limit,
+    build_set_gain,
+    build_set_damper,
+    build_set_friction,
+    build_set_inertia,
+    build_set_spring,
     build_recenter,
     build_set_invert_pedals,
     build_set_throttle_min,
@@ -58,21 +63,31 @@ class Controller:
         self.comm_thread = None
 
     def connect(self, port: str, baudrate: int = 115200) -> None:
+        if self.connection.is_open:
+            self.disconnect()
+
         self.connection.open(port, baudrate)
         self.connected = True
         self.running = True
         self.port = port
         self.last_error = None
+        self.command_queue = queue.Queue()
+        self.response_queue = queue.Queue()
         self.comm_thread = threading.Thread(
             target=self._communication_worker, daemon=True)
         self.comm_thread.start()
 
     def disconnect(self) -> None:
+        self.running = False
+        self.connected = False
+
         if self.connection.is_open:
             self.connection.close()
 
-        self.connected = False
         self.port = None
+        if self.comm_thread is not None and self.comm_thread.is_alive():
+            self.comm_thread.join(timeout=0.3)
+        self.comm_thread = None
 
     def auto_detect(self, baudrate: int = 115200) -> str | None:
         for port in list_available_ports():
@@ -137,6 +152,7 @@ class Controller:
 
             except Exception:
                 self.connected = False
+                self.running = False
 
     def send_command(self, cmd_str: str):
         self.command_queue.put(cmd_str)
@@ -162,6 +178,24 @@ class Controller:
     def apply_steering(self, max_angle: int, output_limit: int) -> None:
         self.send_command(build_set_max_angle(max_angle))
         self.send_command(build_set_output_limit(output_limit))
+
+    def set_max_angle(self, value: int) -> None:
+        self.send_command(build_set_max_angle(value))
+
+    def set_output_limit(self, value: int) -> None:
+        self.send_command(build_set_output_limit(value))
+
+    def apply_ffb_filters(self,
+                          gain: int,
+                          damper: int,
+                          friction: int,
+                          inertia: int,
+                          spring: int) -> None:
+        self.send_command(build_set_gain(gain))
+        self.send_command(build_set_damper(damper))
+        self.send_command(build_set_friction(friction))
+        self.send_command(build_set_inertia(inertia))
+        self.send_command(build_set_spring(spring))
 
     def recenter(self) -> None:
         self.send_command(build_recenter())
@@ -189,6 +223,21 @@ class Controller:
 
     def set_ffb_enable(self, enabled: bool) -> None:
         self.send_command(build_enable_ffb(enabled))
+
+    def set_gain(self, value: int) -> None:
+        self.send_command(build_set_gain(value))
+
+    def set_damper(self, value: int) -> None:
+        self.send_command(build_set_damper(value))
+
+    def set_friction(self, value: int) -> None:
+        self.send_command(build_set_friction(value))
+
+    def set_inertia(self, value: int) -> None:
+        self.send_command(build_set_inertia(value))
+
+    def set_spring(self, value: int) -> None:
+        self.send_command(build_set_spring(value))
 
     def save(self) -> None:
         self.send_command(build_save())

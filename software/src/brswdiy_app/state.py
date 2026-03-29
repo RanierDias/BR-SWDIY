@@ -22,6 +22,11 @@ class AppState:
     angle: int = 0
     max_angle: int = 1080
     output_limit: int = 75
+    gain: int = 50
+    damper: int = 6
+    friction: int = 2
+    inertia: int = 2
+    spring: int = 0
 
     throttle: PedalState = field(default_factory=PedalState)
     brake: PedalState = field(default_factory=PedalState)

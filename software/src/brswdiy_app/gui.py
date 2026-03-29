@@ -3,7 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from brswdiy_app.state import AppState
-from src.brswdiy_app.ui.theme import (
+from brswdiy_app.ui.theme import (
     setup_theme,
     BG_MAIN,
     BG_PANEL,
@@ -140,14 +140,26 @@ class App(ctk.CTk):
         return panel
 
     def _build_steering_panel(self) -> None:
-        body = ctk.CTkFrame(self.steering_frame, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        body = ctk.CTkScrollableFrame(
+            self.steering_frame,
+            fg_color="transparent",
+        )
+        body.pack(fill="both", expand=True, padx=8, pady=(0, 12))
+
+        steering_title = ctk.CTkLabel(
+            body,
+            text="Steering Range",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=TEXT,
+        )
+        steering_title.pack(anchor="w", pady=(6, 0), padx=(0, 6))
 
         angle_box = ctk.CTkFrame(body, fg_color="transparent")
-        angle_box.pack(fill="both", expand=False, pady=(10, 0))
+        angle_box.pack(fill="both", expand=False, pady=(10, 12), padx=(0, 6))
 
         angle_box.grid_columnconfigure(0, weight=1)
         angle_box.grid_columnconfigure(1, weight=1)
+        angle_box.grid_columnconfigure(2, weight=1)
 
         max_angle_label = ctk.CTkLabel(
             angle_box,
@@ -161,7 +173,17 @@ class App(ctk.CTk):
             text="1080",
             text_color=TEXT
         )
-        self.max_angle_value.grid(row=0, column=1, sticky="e")
+        self.max_angle_value.grid(row=0, column=1)
+
+        self.apply_steering_button = ctk.CTkButton(
+            angle_box,
+            text="Apply",
+            width=72,
+            fg_color=BG_ELEMENT,
+            hover_color=ACCENT,
+        )
+        self.apply_steering_button.grid(
+            row=0, column=2, sticky="e")
 
         self.max_angle_slider = ctk.CTkSlider(
             body,
@@ -174,17 +196,26 @@ class App(ctk.CTk):
             button_hover_color=ACCENT,
         )
         self.max_angle_slider.set(940)
-        self.max_angle_slider.pack(fill="x", pady=(0, 14))
+        self.max_angle_slider.pack(fill="x", pady=(0, 14), padx=(0, 6))
+
+        power_title = ctk.CTkLabel(
+            body,
+            text="Motor Safety Limit",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=TEXT,
+        )
+        power_title.pack(anchor="w", pady=(6, 0), padx=(0, 6))
 
         output_box = ctk.CTkFrame(body, fg_color="transparent")
-        output_box.pack(fill="both", expand=False, pady=(10, 0))
+        output_box.pack(fill="both", expand=False, pady=(10, 12), padx=(0, 6))
 
         output_box.grid_columnconfigure(0, weight=1)
         output_box.grid_columnconfigure(1, weight=1)
+        output_box.grid_columnconfigure(2, weight=1)
 
         output_limit_label = ctk.CTkLabel(
             output_box,
-            text="Strength",
+            text="Motor Limit",
             text_color=TEXT,
         )
         output_limit_label.grid(row=0, column=0, sticky="w")
@@ -194,7 +225,17 @@ class App(ctk.CTk):
             text="75",
             text_color=TEXT,
         )
-        self.output_limit_value.grid(row=0, column=1, sticky="e")
+        self.output_limit_value.grid(row=0, column=1)
+
+        self.apply_motor_limit_button = ctk.CTkButton(
+            output_box,
+            text="Apply",
+            width=72,
+            fg_color=BG_ELEMENT,
+            hover_color=ACCENT,
+        )
+        self.apply_motor_limit_button.grid(
+            row=0, column=2, sticky="e")
 
         self.output_limit_slider = ctk.CTkSlider(
             body,
@@ -207,26 +248,85 @@ class App(ctk.CTk):
             button_hover_color=ACCENT,
         )
         self.output_limit_slider.set(75)
-        self.output_limit_slider.pack(fill="x", pady=(0, 18))
+        self.output_limit_slider.pack(fill="x", pady=(0, 18), padx=(0, 6))
 
-        buttons = ctk.CTkFrame(body, fg_color="transparent")
-        buttons.pack(fill="x", pady=(8, 0))
-
-        self.recenter_button = ctk.CTkButton(
-            buttons,
-            text="Recenter",
+        ffb_filters = ctk.CTkFrame(
+            body,
             fg_color=BG_ELEMENT,
-            hover_color=ACCENT,
+            corner_radius=8,
+            border_width=1,
+            border_color=BORDER,
         )
-        self.recenter_button.pack(fill="x", pady=(0, 8))
+        ffb_filters.pack(fill="x", pady=(0, 16), padx=(0, 6))
 
-        self.apply_steering_button = ctk.CTkButton(
-            buttons,
-            text="Apply Steering",
+        ffb_title = ctk.CTkLabel(
+            ffb_filters,
+            text="FFB Filters",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=TEXT,
+        )
+        ffb_title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        self.gain_slider, self.gain_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Gain", 0, 100, 100, 50
+        )
+        self.damper_slider, self.damper_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Damper", 0, 100, 100, 6
+        )
+        self.friction_slider, self.friction_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Friction", 0, 100, 100, 2
+        )
+        self.inertia_slider, self.inertia_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Inertia", 0, 100, 100, 2
+        )
+        self.spring_slider, self.spring_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Spring", 0, 100, 100, 0
+        )
+
+        self.apply_ffb_button = ctk.CTkButton(
+            ffb_filters,
+            text="Apply FFB",
             fg_color=ACCENT,
             hover_color=ACCENT_SOFT,
         )
-        self.apply_steering_button.pack(fill="x")
+        self.apply_ffb_button.pack(fill="x", padx=10, pady=(12, 10))
+
+    def _create_ffb_slider_row(
+        self,
+        parent,
+        title: str,
+        min_value: int,
+        max_value: int,
+        steps: int,
+        default_value: int,
+    ) -> tuple[ctk.CTkSlider, ctk.CTkLabel]:
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=10, pady=(4, 2))
+
+        row.grid_columnconfigure(0, weight=1)
+        row.grid_columnconfigure(1, weight=0)
+
+        label = ctk.CTkLabel(row, text=title, text_color=TEXT)
+        label.grid(row=0, column=0, sticky="w")
+
+        value_label = ctk.CTkLabel(
+            row, text=str(default_value), text_color=TEXT)
+        value_label.grid(row=0, column=1, sticky="e")
+
+        slider = ctk.CTkSlider(
+            parent,
+            from_=min_value,
+            to=max_value,
+            number_of_steps=steps,
+            fg_color=BG_MAIN,
+            progress_color=ACCENT,
+            button_color=ACCENT,
+            button_hover_color=ACCENT,
+        )
+        slider.set(default_value)
+        slider.pack(fill="x", padx=10, pady=(0, 6))
+
+        return slider, value_label
 
     def _build_monitor_panel(self) -> None:
         body = ctk.CTkFrame(self.monitor_frame, fg_color="transparent")
@@ -240,6 +340,14 @@ class App(ctk.CTk):
         )
         self.angle_value_label.pack(
             anchor="center", pady=(12, 16), padx=(15, 0))
+
+        self.center_button = ctk.CTkButton(
+            body,
+            text="Center",
+            fg_color=BG_ELEMENT,
+            hover_color=ACCENT,
+        )
+        self.center_button.pack(fill="x", padx=10, pady=(0, 16))
 
         pedals_box = ctk.CTkFrame(body, fg_color="transparent")
         pedals_box.pack(fill="both", expand=True, pady=(10, 0))
@@ -431,9 +539,22 @@ class App(ctk.CTk):
         self.max_angle_slider.configure(command=self._on_max_angle_slider)
         self.output_limit_slider.configure(
             command=self._on_output_limit_slider)
+        self.gain_slider.configure(
+            command=lambda value: self._on_ffb_slider("gain", value))
+        self.damper_slider.configure(
+            command=lambda value: self._on_ffb_slider("damper", value))
+        self.friction_slider.configure(
+            command=lambda value: self._on_ffb_slider("friction", value))
+        self.inertia_slider.configure(
+            command=lambda value: self._on_ffb_slider("inertia", value))
+        self.spring_slider.configure(
+            command=lambda value: self._on_ffb_slider("spring", value))
 
-        self.recenter_button.configure(command=self._on_recenter)
+        self.center_button.configure(command=self._on_recenter)
         self.apply_steering_button.configure(command=self._on_apply_steering)
+        self.apply_motor_limit_button.configure(
+            command=self._on_apply_motor_limit)
+        self.apply_ffb_button.configure(command=self._on_apply_ffb)
 
         self.throttle_offset_slider.configure(
             command=lambda value: self._on_offset_slider_change(
@@ -485,6 +606,10 @@ class App(ctk.CTk):
     def _on_output_limit_slider(self, value: float) -> None:
         self.output_limit_value.configure(text=str(int(value)))
 
+    def _on_ffb_slider(self, attr_name: str, value: float) -> None:
+        label = getattr(self, f"{attr_name}_value_label")
+        label.configure(text=str(int(value)))
+
     def _on_offset_slider_change(self, label: ctk.CTkLabel, value: float) -> None:
         label.configure(text=str(int(value)))
 
@@ -495,8 +620,9 @@ class App(ctk.CTk):
             self.controller.disconnect()
             self.app_state.connected = False
             self.app_state.detected_port = None
-            self.app_state.status_text = "Disconnect"
+            self.app_state.status_text = "Disconnected"
             self.switch_button.configure(text="Connect")
+            self.switch_button.configure(hover_color=ACCENT_SOFT)
             self.status_label.configure(text=self.app_state.status_text)
             return
 
@@ -570,6 +696,11 @@ class App(ctk.CTk):
 
         self.app_state.max_angle = frame.max_angle
         self.app_state.output_limit = frame.output_limit
+        self.app_state.gain = frame.gain
+        self.app_state.damper = frame.damper
+        self.app_state.friction = frame.friction
+        self.app_state.inertia = frame.inertia
+        self.app_state.spring = frame.spring
         self.app_state.invert_pedals = frame.invert_pedals
         self.app_state.ffb_enabled = frame.motor_enable
 
@@ -589,6 +720,16 @@ class App(ctk.CTk):
         self.output_limit_slider.set(self.app_state.output_limit)
         self.output_limit_value.configure(
             text=str(self.app_state.output_limit))
+        self.gain_slider.set(self.app_state.gain)
+        self.gain_value_label.configure(text=str(self.app_state.gain))
+        self.damper_slider.set(self.app_state.damper)
+        self.damper_value_label.configure(text=str(self.app_state.damper))
+        self.friction_slider.set(self.app_state.friction)
+        self.friction_value_label.configure(text=str(self.app_state.friction))
+        self.inertia_slider.set(self.app_state.inertia)
+        self.inertia_value_label.configure(text=str(self.app_state.inertia))
+        self.spring_slider.set(self.app_state.spring)
+        self.spring_value_label.configure(text=str(self.app_state.spring))
 
         self.invert_checkbox.select() if frame.invert_pedals else self.invert_checkbox.deselect()
         self.ffb_checkbox.select() if frame.motor_enable else self.ffb_checkbox.deselect()
@@ -599,13 +740,25 @@ class App(ctk.CTk):
 
         try:
             max_angle = int(self.max_angle_slider.get())
-            output_limit = int(self.output_limit_slider.get())
-
-            self.controller.apply_steering(max_angle, output_limit)
+            self.controller.set_max_angle(max_angle)
 
             self.app_state.max_angle = max_angle
+            self.res_label.configure(text="Lock angle applied")
+
+        except Exception as exc:
+            self.app_state.last_error = str(exc)
+            self.res_label.configure(text=f"Error: {exc}")
+
+    def _on_apply_motor_limit(self) -> None:
+        if not self.controller.is_connected():
+            return
+
+        try:
+            output_limit = int(self.output_limit_slider.get())
+            self.controller.set_output_limit(output_limit)
+
             self.app_state.output_limit = output_limit
-            self.res_label.configure(text="Steering applied")
+            self.res_label.configure(text="Motor limit applied")
 
         except Exception as exc:
             self.app_state.last_error = str(exc)
@@ -618,6 +771,31 @@ class App(ctk.CTk):
         try:
             self.controller.recenter()
             self.res_label.configure(text="Recentered")
+
+        except Exception as exc:
+            self.app_state.last_error = str(exc)
+            self.res_label.configure(text=f"Error: {exc}")
+
+    def _on_apply_ffb(self) -> None:
+        if not self.controller.is_connected():
+            return
+
+        try:
+            gain = int(self.gain_slider.get())
+            damper = int(self.damper_slider.get())
+            friction = int(self.friction_slider.get())
+            inertia = int(self.inertia_slider.get())
+            spring = int(self.spring_slider.get())
+
+            self.controller.apply_ffb_filters(
+                gain, damper, friction, inertia, spring)
+
+            self.app_state.gain = gain
+            self.app_state.damper = damper
+            self.app_state.friction = friction
+            self.app_state.inertia = inertia
+            self.app_state.spring = spring
+            self.res_label.configure(text="FFB filters applied")
 
         except Exception as exc:
             self.app_state.last_error = str(exc)

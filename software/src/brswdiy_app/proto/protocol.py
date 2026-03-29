@@ -25,6 +25,26 @@ def build_set_output_limit(value: int) -> str:
     return f"AMX {value}"
 
 
+def build_set_gain(value: int) -> str:
+    return f"GAIN {value}"
+
+
+def build_set_damper(value: int) -> str:
+    return f"DAM {value}"
+
+
+def build_set_friction(value: int) -> str:
+    return f"FRI {value}"
+
+
+def build_set_inertia(value: int) -> str:
+    return f"INE {value}"
+
+
+def build_set_spring(value: int) -> str:
+    return f"SPR {value}"
+
+
 def build_recenter() -> str:
     return "RCE"
 
