@@ -22,6 +22,10 @@ uint16_t get_max_angle();
 
 bool set_max_angle(int value);
 bool set_gain(int gain);
+bool set_damper(int value);
+bool set_friction(int value);
+bool set_inertia(int value);
+bool set_spring(int value);
 bool set_output_limit(int limit);
 bool set_safe_start(bool safe_start);
 bool set_watchdog(int watchdog_ms);

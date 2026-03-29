@@ -6,7 +6,7 @@ namespace
 {
     constexpr int EEPROM_START_ADDRESS = 0;
     constexpr uint16_t PERSISTED_CONFIG_MAGIC = 0x4252;
-    constexpr uint8_t PERSISTED_CONFIG_VERSION = 1;
+    constexpr uint8_t PERSISTED_CONFIG_VERSION = 2;
 }
 
 bool is_config_valid(const PersistedConfig &config)

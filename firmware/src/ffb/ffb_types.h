@@ -49,7 +49,6 @@ struct FfbEffectSlot
     uint16_t duration_ms = 0;
     uint16_t start_delay_ms = 0;
     uint8_t loop_count = 1;
-    int16_t direction = 0;
     int16_t magnitude = 0;
     int16_t ramp_start = 0;
     int16_t ramp_end = 0;

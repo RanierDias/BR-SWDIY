@@ -7,11 +7,19 @@ namespace
     constexpr uint8_t MOTOR_LEFT_PIN = 9;
     constexpr uint8_t MOTOR_RIGHT_PIN = 10;
     constexpr uint8_t MOTOR_ENABLE_PIN = 11;
+    constexpr uint8_t MIN_EFFECTIVE_PWM = 32;
 }
 
 static uint8_t percent_to_pwm(uint16_t percent)
 {
-    return static_cast<uint8_t>((percent * 255) / 100);
+    if (percent == 0)
+    {
+        return 0;
+    }
+
+    return static_cast<uint8_t>(
+        MIN_EFFECTIVE_PWM +
+        ((static_cast<uint32_t>(percent - 1U) * (255U - MIN_EFFECTIVE_PWM)) / 99U));
 }
 
 void setup_motor()

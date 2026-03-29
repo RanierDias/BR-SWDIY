@@ -58,6 +58,10 @@ static PersistedConfig build_persisted_config()
 
   settings.max_angle = g_config.max_angle;
   settings.gain = g_config.gain;
+  settings.damper = g_config.damper;
+  settings.friction = g_config.friction;
+  settings.inertia = g_config.inertia;
+  settings.spring = g_config.spring;
   settings.output_limit = g_config.output_limit;
   settings.safe_start = g_config.safe_start;
   settings.watchdog_ms = g_config.watchdog_ms;
@@ -78,6 +82,10 @@ static void apply_persisted_config(const PersistedConfig &settings)
   g_config.max_angle = settings.max_angle;
   g_max_angle_counts = settings.max_angle * 10 / 3;
   g_config.gain = settings.gain;
+  g_config.damper = settings.damper;
+  g_config.friction = settings.friction;
+  g_config.inertia = settings.inertia;
+  g_config.spring = settings.spring;
   g_config.output_limit = settings.output_limit;
   g_config.safe_start = settings.safe_start;
   g_config.watchdog_ms = settings.watchdog_ms;
@@ -218,15 +226,14 @@ void update_app()
   const uint32_t now = micros();
 
   update_encoder();
+  update_pedals();
   refresh_control_state(now);
   update_motor_output();
+  update_usb_wheel();
 
   if ((now - g_last_slow_update) >= 5000)
   {
     g_last_slow_update = now;
-
-    update_pedals();
-    update_usb_wheel();
     process_serial_protocol();
   }
 }
@@ -295,6 +302,50 @@ bool set_gain(int gain)
   }
 
   g_config.gain = gain;
+  return true;
+}
+
+bool set_damper(int value)
+{
+  if (value < 0 || value > 100)
+  {
+    return false;
+  }
+
+  g_config.damper = static_cast<uint8_t>(value);
+  return true;
+}
+
+bool set_friction(int value)
+{
+  if (value < 0 || value > 100)
+  {
+    return false;
+  }
+
+  g_config.friction = static_cast<uint8_t>(value);
+  return true;
+}
+
+bool set_inertia(int value)
+{
+  if (value < 0 || value > 100)
+  {
+    return false;
+  }
+
+  g_config.inertia = static_cast<uint8_t>(value);
+  return true;
+}
+
+bool set_spring(int value)
+{
+  if (value < 0 || value > 100)
+  {
+    return false;
+  }
+
+  g_config.spring = static_cast<uint8_t>(value);
   return true;
 }
 

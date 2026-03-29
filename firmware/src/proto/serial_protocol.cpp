@@ -8,7 +8,7 @@
 
 namespace
 {
-  constexpr uint8_t LINE_BUFFER_SIZE = 64;
+  constexpr uint8_t LINE_BUFFER_SIZE = 80;
   char g_line[LINE_BUFFER_SIZE];
   uint8_t g_line_len = 0;
 
@@ -56,6 +56,7 @@ namespace
     if (strcmp(raw, "CAL") == 0)
     {
       const InputCalibration &calibration = get_pedal_calibration();
+      const DeviceConfig &config = get_config();
 
       Serial.print(F("C A="));
       Serial.print(get_max_angle());
@@ -64,7 +65,22 @@ namespace
       Serial.print(calibration.invert_pedals ? 1 : 0);
 
       Serial.print(F(" O="));
-      Serial.print(get_config().output_limit);
+      Serial.print(config.output_limit);
+
+      Serial.print(F(" G="));
+      Serial.print(config.gain);
+
+      Serial.print(F(" D="));
+      Serial.print(config.damper);
+
+      Serial.print(F(" F="));
+      Serial.print(config.friction);
+
+      Serial.print(F(" N="));
+      Serial.print(config.inertia);
+
+      Serial.print(F(" S="));
+      Serial.print(config.spring);
 
       Serial.print(F(" M="));
       Serial.print(get_status().motor_enabled);
@@ -120,6 +136,91 @@ namespace
     if (strcmp(raw, "HI") == 0)
     {
       Serial.println(F("OK BRSWDIY"));
+      return;
+    }
+
+    if (strncmp(raw, "GAIN ", 5) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_gain(value))
+      {
+        Serial.print(F("OK GAIN="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "ANG");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "DAM ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_damper(value))
+      {
+        Serial.print(F("OK DAM="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "DAM");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "FRI ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_friction(value))
+      {
+        Serial.print(F("OK FRI="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "FRI");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "INE ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_inertia(value))
+      {
+        Serial.print(F("OK INE="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "INE");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "SPR ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_spring(value))
+      {
+        Serial.print(F("OK SPR="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "SPR");
+      }
+
       return;
     }
 

@@ -77,7 +77,7 @@ namespace
     constexpr uint8_t EFFECT_TYPE_INERTIA_USAGE = 0x42;
     constexpr uint8_t EFFECT_TYPE_FRICTION_USAGE = 0x43;
 
-    constexpr uint32_t INPUT_REPORT_INTERVAL_MS = 5;
+    constexpr uint32_t INPUT_REPORT_INTERVAL_MS = 2;
     constexpr uint32_t STATUS_REPORT_INTERVAL_MS = 20;
 
     struct __attribute__((packed)) SetEffectOutputReport
