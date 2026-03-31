@@ -5,6 +5,7 @@
 struct DeviceConfig
 {
   uint16_t max_angle = 1080;
+  uint16_t encoder_ppr = 600;
   uint8_t gain = 50;
   uint8_t damper = 0;
   uint8_t friction = 0;

@@ -30,10 +30,29 @@ static constexpr int8_t LOCK_ZONE = 20;
 static constexpr int8_t LOCK_MIN_FORCE = 12;
 static constexpr int8_t LOCK_MAX_FORCE = 100;
 
+static uint16_t compute_encoder_counts_per_rev(uint16_t encoder_ppr)
+{
+  if (get_encoder_type() == EncoderType::AS5600)
+  {
+    return 4096;
+  }
+
+  return static_cast<uint16_t>(constrain(static_cast<uint32_t>(encoder_ppr) * 2UL, 1UL, 32767UL));
+}
+
+static uint16_t compute_max_angle_counts(uint16_t max_angle, uint16_t encoder_ppr)
+{
+  const uint32_t counts_per_rev = compute_encoder_counts_per_rev(encoder_ppr);
+  const uint32_t counts = (static_cast<uint32_t>(max_angle) * counts_per_rev) / 360UL;
+
+  return static_cast<uint16_t>(constrain(counts, 1UL, 32767UL));
+}
+
 static void apply_default_config()
 {
   g_config.max_angle = 720;
-  g_max_angle_counts = 2400;
+  g_config.encoder_ppr = 600;
+  g_max_angle_counts = compute_max_angle_counts(g_config.max_angle, g_config.encoder_ppr);
   g_config.gain = brswdiy::protocol::GAIN_DEFAULT;
   g_config.damper = 6;
   g_config.friction = 2;
@@ -57,6 +76,7 @@ static PersistedConfig build_persisted_config()
   PersistedConfig settings;
 
   settings.max_angle = g_config.max_angle;
+  settings.encoder_ppr = g_config.encoder_ppr;
   settings.gain = g_config.gain;
   settings.damper = g_config.damper;
   settings.friction = g_config.friction;
@@ -80,7 +100,8 @@ static PersistedConfig build_persisted_config()
 static void apply_persisted_config(const PersistedConfig &settings)
 {
   g_config.max_angle = settings.max_angle;
-  g_max_angle_counts = settings.max_angle * 10 / 3;
+  g_config.encoder_ppr = settings.encoder_ppr;
+  g_max_angle_counts = compute_max_angle_counts(settings.max_angle, settings.encoder_ppr);
   g_config.gain = settings.gain;
   g_config.damper = settings.damper;
   g_config.friction = settings.friction;
@@ -214,7 +235,6 @@ void setup_app()
   apply_default_config();
 
   g_status.motor_enabled = true;
-  g_status.limit = g_config.output_limit;
   g_status.config_saved = load_config();
 
   g_encoder_zero_offset = get_encoder_position();
@@ -258,6 +278,16 @@ uint16_t get_max_angle()
   return g_config.max_angle;
 }
 
+uint16_t get_half_angle_counts()
+{
+  return g_max_angle_counts / 2;
+}
+
+uint16_t get_encoder_ppr()
+{
+  return g_config.encoder_ppr;
+}
+
 bool save_config()
 {
   const PersistedConfig settings = build_persisted_config();
@@ -280,7 +310,6 @@ bool load_config()
 void reset_config()
 {
   apply_default_config();
-  g_status.limit = g_config.output_limit;
 }
 
 bool set_max_angle(int value)
@@ -289,8 +318,19 @@ bool set_max_angle(int value)
     return false;
 
   g_config.max_angle = value;
+  g_max_angle_counts = compute_max_angle_counts(g_config.max_angle, g_config.encoder_ppr);
+  return true;
+}
 
-  g_max_angle_counts = (uint16_t)((uint32_t)value * 10 / 3);
+bool set_encoder_ppr(int value)
+{
+  if (value < 100 || value > 4096)
+  {
+    return false;
+  }
+
+  g_config.encoder_ppr = static_cast<uint16_t>(value);
+  g_max_angle_counts = compute_max_angle_counts(g_config.max_angle, g_config.encoder_ppr);
   return true;
 }
 
@@ -357,7 +397,6 @@ bool set_output_limit(int limit)
   }
 
   g_config.output_limit = limit;
-  g_status.limit = limit;
   return true;
 }
 

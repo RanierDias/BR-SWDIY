@@ -52,6 +52,7 @@ struct FfbEffectSlot
     int16_t magnitude = 0;
     int16_t ramp_start = 0;
     int16_t ramp_end = 0;
+    uint16_t direction = 0;
     uint32_t start_time_ms = 0;
     FfbCondition condition;
     FfbPeriodic periodic;

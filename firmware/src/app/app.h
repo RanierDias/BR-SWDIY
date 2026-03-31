@@ -19,8 +19,11 @@ bool recenter_encoder();
 bool handle_motor(bool enable);
 
 uint16_t get_max_angle();
+uint16_t get_half_angle_counts();
+uint16_t get_encoder_ppr();
 
 bool set_max_angle(int value);
+bool set_encoder_ppr(int value);
 bool set_gain(int gain);
 bool set_damper(int value);
 bool set_friction(int value);

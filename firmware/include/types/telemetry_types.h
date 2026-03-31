@@ -9,7 +9,6 @@ struct DeviceStatus
     int16_t angle = 0;
     int16_t center = 0;
     int8_t output = 0;
-    uint8_t limit = 0;
     uint16_t throttle = 0;
     uint16_t brake = 0;
     uint16_t clutch = 0;

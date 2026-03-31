@@ -20,16 +20,15 @@
 #include "USBAPI.h"
 #include "USBDesc.h"
 
-
 #if defined(USBCON)
 
-#define EP_TYPE_CONTROL				0x00
-#define EP_TYPE_BULK_IN				0x81
-#define EP_TYPE_BULK_OUT			0x80
-#define EP_TYPE_INTERRUPT_IN		0xC1
-#define EP_TYPE_INTERRUPT_OUT		0xC0
-#define EP_TYPE_ISOCHRONOUS_IN		0x41
-#define EP_TYPE_ISOCHRONOUS_OUT		0x40
+#define EP_TYPE_CONTROL 0x00
+#define EP_TYPE_BULK_IN 0x81
+#define EP_TYPE_BULK_OUT 0x80
+#define EP_TYPE_INTERRUPT_IN 0xC1
+#define EP_TYPE_INTERRUPT_OUT 0xC0
+#define EP_TYPE_ISOCHRONOUS_IN 0x41
+#define EP_TYPE_ISOCHRONOUS_OUT 0x40
 
 /** Pulse generation counters to keep track of the number of milliseconds remaining for each pulse type */
 #define TX_RX_LED_PULSE_MS 100
@@ -46,34 +45,34 @@ extern const DeviceDescriptor USB_DeviceDescriptor PROGMEM;
 extern const DeviceDescriptor USB_DeviceDescriptorA PROGMEM;
 
 const u16 STRING_LANGUAGE[2] = {
-  (3 << 8) | (2 + 2),
-  0x0409	// English
+    (3 << 8) | (2 + 2),
+    0x0409 // English
 };
+
+#if defined(BRSWDIY_USB_PRODUCT_16)
+#define USB_PRODUCT_16 BRSWDIY_USB_PRODUCT_16
+#elif defined(ENCODER_AS5600_ENABLED) && (ENCODER_AS5600_ENABLED == 1) && defined(FFB_DIRECTION_ENABLED) && (FFB_DIRECTION_ENABLED == 1)
+#define USB_PRODUCT_16 'A', 'p', 'u', 's', ' ', 'D', 'i', 'r', ' ', 'M', 'a', 'g', ' ', ' ', ' ', ' '
+#elif defined(ENCODER_AS5600_ENABLED) && (ENCODER_AS5600_ENABLED == 1)
+#define USB_PRODUCT_16 'A', 'p', 'u', 's', ' ', 'R', 'a', 'w', ' ', 'M', 'a', 'g', ' ', ' ', ' ', ' '
+#elif defined(FFB_DIRECTION_ENABLED) && (FFB_DIRECTION_ENABLED == 1)
+#define USB_PRODUCT_16 'A', 'p', 'u', 's', ' ', 'D', 'i', 'r', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '
+#else
+#define USB_PRODUCT_16 'A', 'p', 'u', 's', ' ', 'R', 'a', 'w', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '
+#endif
 
 const u16 STRING_IPRODUCT[17] = {
-  (3 << 8) | (2 + 2 * 16),
-
-#if USB_PID == 0x8036
-  'A', 'r', 'd', 'u', 'i', 'n', 'o', ' ', 'L', 'e', 'o', 'n', 'a', 'r', 'd', 'o'
-#elif USB_PID == 0x8037
-  'A', 'r', 'd', 'u', 'i', 'n', 'o', ' ', 'M', 'i', 'c', 'r', 'o', ' ', ' ', ' '
-#elif USB_PID == 0x803C
-  'A', 'r', 'd', 'u', 'i', 'n', 'o', ' ', 'E', 's', 'p', 'l', 'o', 'r', 'a', ' '
-#elif USB_PID == 0x9208
-  'L', 'i', 'l', 'y', 'P', 'a', 'd', 'U', 'S', 'B', ' ', ' ', ' ', ' ', ' ', ' '
-#else
-  'B', 'R', 'W', 'h', 'e', 'e', 'l', ' ', 'J', 'o', 'y', 's', 't', 'i', 'c', 'k'
-#endif
-};
+    (3 << 8) | (2 + 2 * 16),
+    USB_PRODUCT_16};
 
 const u16 STRING_IMANUFACTURER[12] = {
-  (3 << 8) | (2 + 2 * 11),
+    (3 << 8) | (2 + 2 * 11),
 #if USB_VID == 0x2341
-  'A', 'r', 'd', 'u', 'i', 'n', 'o', ' ', 'L', 'L', 'C'
+    'A', 'r', 'd', 'u', 'i', 'n', 'o', ' ', 'L', 'L', 'C'
 #elif USB_VID == 0x1b4f
-  'S', 'p', 'a', 'r', 'k', 'F', 'u', 'n', ' ', ' ', ' '
+    'S', 'p', 'a', 'r', 'k', 'F', 'u', 'n', ' ', ' ', ' '
 #else
-  'F', 'I', ' ', 'O', 'p', 'S', 'o', 'u', 'r', 'c', 'e'
+    'F', 'I', ' ', 'O', 'p', 'S', 'o', 'u', 'r', 'c', 'e'
 #endif
 };
 
@@ -85,10 +84,10 @@ const u16 STRING_IMANUFACTURER[12] = {
 
 //	DEVICE DESCRIPTOR
 const DeviceDescriptor USB_DeviceDescriptor =
-  D_DEVICE(0x00, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, 0, 1);
+    D_DEVICE(0x00, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, 0, 1);
 
 const DeviceDescriptor USB_DeviceDescriptorA =
-  D_DEVICE(DEVICE_CLASS, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, 0, 1);
+    D_DEVICE(DEVICE_CLASS, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, 0, 1);
 
 //==================================================================
 //==================================================================
@@ -97,7 +96,8 @@ volatile u8 _usbConfiguration = 0;
 
 static inline void WaitIN(void)
 {
-  while (!(UEINTX & (1 << TXINI)));
+  while (!(UEINTX & (1 << TXINI)))
+    ;
 }
 
 static inline void ClearIN(void)
@@ -123,7 +123,7 @@ static inline void ClearOUT(void)
   UEINTX = ~(1 << RXOUTI);
 }
 
-void Recv(volatile u8* data, u8 count)
+void Recv(volatile u8 *data, u8 count)
 {
   while (count--)
     *data++ = UEDATX;
@@ -187,12 +187,12 @@ static inline u8 FifoFree()
 
 static inline void ReleaseRX()
 {
-  UEINTX = 0x6B;	// FIFOCON=0 NAKINI=1 RWAL=1 NAKOUTI=0 RXSTPI=1 RXOUTI=0 STALLEDI=1 TXINI=1
+  UEINTX = 0x6B; // FIFOCON=0 NAKINI=1 RWAL=1 NAKOUTI=0 RXSTPI=1 RXOUTI=0 STALLEDI=1 TXINI=1
 }
 
 static inline void ReleaseTX()
 {
-  UEINTX = 0x3A;	// FIFOCON=0 NAKINI=0 RWAL=1 NAKOUTI=1 RXSTPI=1 RXOUTI=0 STALLEDI=1 TXINI=0
+  UEINTX = 0x3A; // FIFOCON=0 NAKINI=0 RWAL=1 NAKOUTI=1 RXSTPI=1 RXOUTI=0 STALLEDI=1 TXINI=0
 }
 
 static inline u8 FrameNumber()
@@ -211,17 +211,18 @@ u8 USBGetConfiguration(void)
 #define USB_RECV_TIMEOUT
 class LockEP
 {
-    u8 _sreg;
-  public:
-    LockEP(u8 ep) : _sreg(SREG)
-    {
-      cli();
-      SetEP(ep & 7);
-    }
-    ~LockEP()
-    {
-      SREG = _sreg;
-    }
+  u8 _sreg;
+
+public:
+  LockEP(u8 ep) : _sreg(SREG)
+  {
+    cli();
+    SetEP(ep & 7);
+  }
+  ~LockEP()
+  {
+    SREG = _sreg;
+  }
 };
 
 //	Number of bytes, assumes a rx endpoint
@@ -233,7 +234,7 @@ u8 USB_Available(u8 ep)
 
 //	Non Blocking receive
 //	Return number of bytes read
-int USB_Recv(u8 ep, void* d, int len)
+int USB_Recv(u8 ep, void *d, int len)
 {
   if (!_usbConfiguration || len < 0)
     return -1;
@@ -242,10 +243,10 @@ int USB_Recv(u8 ep, void* d, int len)
   u8 n = FifoByteCount();
   len = min(n, len);
   n = len;
-  u8* dst = (u8*)d;
+  u8 *dst = (u8 *)d;
   while (n--)
     *dst++ = Recv8();
-  if (len && !FifoByteCount())	// release empty buffer
+  if (len && !FifoByteCount()) // release empty buffer
     ReleaseRX();
 
   return len;
@@ -270,14 +271,14 @@ u8 USB_SendSpace(u8 ep)
 }
 
 //	Blocking Send of data to an endpoint
-int USB_Send(u8 ep, const void* d, int len)
+int USB_Send(u8 ep, const void *d, int len)
 {
   if (!_usbConfiguration)
     return -1;
 
   int r = len;
-  const u8* data = (const u8*)d;
-  u8 timeout = 250;		// 250ms timeout on send? TODO
+  const u8 *data = (const u8 *)d;
+  u8 timeout = 250; // 250ms timeout on send? TODO
   while (len)
   {
     u8 n = USB_SendSpace(ep);
@@ -309,37 +310,36 @@ int USB_Send(u8 ep, const void* d, int len)
         while (n--)
           Send8(*data++);
       }
-      if (!ReadWriteAllowed() || ((len == 0) && (ep & TRANSFER_RELEASE)))	// Release full buffer
+      if (!ReadWriteAllowed() || ((len == 0) && (ep & TRANSFER_RELEASE))) // Release full buffer
         ReleaseTX();
     }
   }
-  TXLED1;					// light the TX LED
+  TXLED1; // light the TX LED
   TxLEDPulse = TX_RX_LED_PULSE_MS;
   return r;
 }
 
 extern const u8 _initEndpoints[] PROGMEM;
 const u8 _initEndpoints[] =
-{
-  0,
+    {
+        0,
 
 #ifdef CDC_ENABLED
-  EP_TYPE_INTERRUPT_IN,		// CDC_ENDPOINT_ACM
-  EP_TYPE_BULK_OUT,			// CDC_ENDPOINT_OUT
-  EP_TYPE_BULK_IN,			// CDC_ENDPOINT_IN
+        EP_TYPE_INTERRUPT_IN, // CDC_ENDPOINT_ACM
+        EP_TYPE_BULK_OUT,     // CDC_ENDPOINT_OUT
+        EP_TYPE_BULK_IN,      // CDC_ENDPOINT_IN
 #endif
 
 #ifdef HID_ENABLED
-  EP_TYPE_INTERRUPT_IN,		// HID_ENDPOINT_INT
-  EP_TYPE_INTERRUPT_OUT		// HID_ENDPOINT_OUT
+        EP_TYPE_INTERRUPT_IN, // HID_ENDPOINT_INT
+        EP_TYPE_INTERRUPT_OUT // HID_ENDPOINT_OUT
 #endif
 };
 
-#define EP_SINGLE_64 0x32	// EP0
-#define EP_DOUBLE_64 0x36	// Other endpoints
+#define EP_SINGLE_64 0x32 // EP0
+#define EP_DOUBLE_64 0x36 // Other endpoints
 
-static
-void InitEP(u8 index, u8 type, u8 size)
+static void InitEP(u8 index, u8 type, u8 size)
 {
   UENUM = index;
   UECONX = 1;
@@ -347,8 +347,7 @@ void InitEP(u8 index, u8 type, u8 size)
   UECFG1X = size;
 }
 
-static
-void InitEndpoints()
+static void InitEndpoints()
 {
   for (u8 i = 1; i < sizeof(_initEndpoints); i++)
   {
@@ -357,13 +356,12 @@ void InitEndpoints()
     UECFG0X = pgm_read_byte(_initEndpoints + i);
     UECFG1X = EP_DOUBLE_64;
   }
-  UERST = 0x7E;	// And reset them
+  UERST = 0x7E; // And reset them
   UERST = 0;
 }
 
 //	Handle CLASS_INTERFACE requests
-static
-bool ClassInterfaceRequest(Setup& setup)
+static bool ClassInterfaceRequest(Setup &setup)
 {
   u8 i = setup.wIndex;
 #ifdef CDC_ENABLED
@@ -387,8 +385,7 @@ void InitControl(int end)
   _cend = end;
 }
 
-static
-bool SendControl(u8 d)
+static bool SendControl(u8 d)
 {
   if (_cmark < _cend)
   {
@@ -396,17 +393,17 @@ bool SendControl(u8 d)
       return false;
     Send8(d);
     if (!((_cmark + 1) & 0x3F))
-      ClearIN();	// Fifo is full, release this packet
+      ClearIN(); // Fifo is full, release this packet
   }
   _cmark++;
   return true;
 };
 
 //	Clipped by _cmark/_cend
-int USB_SendControl(u8 flags, const void* d, int len)
+int USB_SendControl(u8 flags, const void *d, int len)
 {
   int sent = len;
-  const u8* data = (const u8*)d;
+  const u8 *data = (const u8 *)d;
   bool pgm = flags & TRANSFER_PGM;
   while (len--)
   {
@@ -420,10 +417,10 @@ int USB_SendControl(u8 flags, const void* d, int len)
 //	Does not timeout or cross fifo boundaries
 //	Will only work for transfers <= 64 bytes
 //	TODO
-int USB_RecvControl(void* d, int len)
+int USB_RecvControl(void *d, int len)
 {
   WaitOUT();
-  Recv((u8*)d, len);
+  Recv((u8 *)d, len);
   ClearOUT();
   return len;
 }
@@ -447,8 +444,7 @@ int SendInterfaces()
 //	Construct a dynamic configuration descriptor
 //	This really needs dynamic endpoint allocation etc
 //	TODO
-static
-bool SendConfiguration(int maxlen)
+static bool SendConfiguration(int maxlen)
 {
   //	Count and measure interfaces
   InitControl(0);
@@ -464,8 +460,7 @@ bool SendConfiguration(int maxlen)
 
 u8 _cdcComposite = 0;
 
-static
-bool SendDescriptor(Setup& setup)
+static bool SendDescriptor(Setup &setup)
 {
   u8 t = setup.wValueH;
   if (USB_CONFIGURATION_DESCRIPTOR_TYPE == t)
@@ -478,21 +473,21 @@ bool SendDescriptor(Setup& setup)
 #endif
 
   u8 desc_length = 0;
-  const u8* desc_addr = 0;
+  const u8 *desc_addr = 0;
   if (USB_DEVICE_DESCRIPTOR_TYPE == t)
   {
     if (setup.wLength == 8)
       _cdcComposite = 1;
-    desc_addr = _cdcComposite ?  (const u8*)&USB_DeviceDescriptorA : (const u8*)&USB_DeviceDescriptor;
+    desc_addr = _cdcComposite ? (const u8 *)&USB_DeviceDescriptorA : (const u8 *)&USB_DeviceDescriptor;
   }
   else if (USB_STRING_DESCRIPTOR_TYPE == t)
   {
     if (setup.wValueL == 0)
-      desc_addr = (const u8*)&STRING_LANGUAGE;
+      desc_addr = (const u8 *)&STRING_LANGUAGE;
     else if (setup.wValueL == IPRODUCT)
-      desc_addr = (const u8*)&STRING_IPRODUCT;
+      desc_addr = (const u8 *)&STRING_IPRODUCT;
     else if (setup.wValueL == IMANUFACTURER)
-      desc_addr = (const u8*)&STRING_IMANUFACTURER;
+      desc_addr = (const u8 *)&STRING_IMANUFACTURER;
     else
       return false;
   }
@@ -514,7 +509,7 @@ ISR(USB_COM_vect)
     return;
 
   Setup setup;
-  Recv((u8*)&setup, 8);
+  Recv((u8 *)&setup, 8);
   ClearSetupInt();
 
   u8 requestType = setup.bmRequestType;
@@ -530,7 +525,7 @@ ISR(USB_COM_vect)
     u8 r = setup.bRequest;
     if (GET_STATUS == r)
     {
-      Send8(0);		// TODO
+      Send8(0); // TODO
       Send8(0);
     }
     else if (CLEAR_FEATURE == r)
@@ -562,7 +557,8 @@ ISR(USB_COM_vect)
       {
         InitEndpoints();
         _usbConfiguration = setup.wValueL;
-      } else
+      }
+      else
         ok = false;
     }
     else if (GET_INTERFACE == r)
@@ -574,7 +570,7 @@ ISR(USB_COM_vect)
   }
   else
   {
-    InitControl(setup.wLength);		//	Max length of transfer
+    InitControl(setup.wLength); //	Max length of transfer
     ok = ClassInterfaceRequest(setup);
   }
 
@@ -602,16 +598,16 @@ ISR(USB_GEN_vect)
   //	End of Reset
   if (udint & (1 << EORSTI))
   {
-    InitEP(0, EP_TYPE_CONTROL, EP_SINGLE_64);	// init ep0
-    _usbConfiguration = 0;			// not configured yet
-    UEIENX = 1 << RXSTPE;			// Enable interrupts for ep0
+    InitEP(0, EP_TYPE_CONTROL, EP_SINGLE_64); // init ep0
+    _usbConfiguration = 0;                    // not configured yet
+    UEIENX = 1 << RXSTPE;                     // Enable interrupts for ep0
   }
 
   //	Start of Frame - happens every millisecond so we use it for TX and RX LED one-shot timing, too
   if (udint & (1 << SOFI))
   {
 #ifdef CDC_ENABLED
-    USB_Flush(CDC_TX);				// Send a tx frame if found
+    USB_Flush(CDC_TX); // Send a tx frame if found
 #endif
 #ifdef HID_ENABLED
     if ((HID_ReportAvailable() > 0) && (USBDevice.HID_ReceiveReport_Callback != NULL))
@@ -654,14 +650,14 @@ USBDevice_::USBDevice_()
 void USBDevice_::attach()
 {
   _usbConfiguration = 0;
-  UHWCON = 0x01;						// power internal reg
-  USBCON = (1 << USBE) | (1 << FRZCLK);		// clock frozen, usb enabled
+  UHWCON = 0x01;                        // power internal reg
+  USBCON = (1 << USBE) | (1 << FRZCLK); // clock frozen, usb enabled
 #if F_CPU == 16000000UL
-  PLLCSR = 0x12;						// Need 16 MHz xtal
+  PLLCSR = 0x12; // Need 16 MHz xtal
 #elif F_CPU == 8000000UL
-  PLLCSR = 0x02;						// Need 8 MHz xtal
+  PLLCSR = 0x02; // Need 8 MHz xtal
 #endif
-  while (!(PLLCSR & (1 << PLOCK)))		// wait for lock pll
+  while (!(PLLCSR & (1 << PLOCK))) // wait for lock pll
     ;
 
   // Some tests on specific versions of macosx (10.7.3), reported some
@@ -669,9 +665,9 @@ void USBDevice_::attach()
   // port touch at 1200 bps. This delay fixes this behaviour.
   delay(1);
 
-  USBCON = ((1 << USBE) | (1 << OTGPADE));	// start USB clock
-  UDIEN = (1 << EORSTE) | (1 << SOFE);		// Enable interrupts for EOR (End of Reset) and SOF (start of frame)
-  UDCON = 0;							// enable attach resistor
+  USBCON = ((1 << USBE) | (1 << OTGPADE)); // start USB clock
+  UDIEN = (1 << EORSTE) | (1 << SOFE);     // Enable interrupts for EOR (End of Reset) and SOF (start of frame)
+  UDCON = 0;                               // enable attach resistor
 
   //	TX_RX_LED_INIT;
 }

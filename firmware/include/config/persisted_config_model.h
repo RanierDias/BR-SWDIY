@@ -5,8 +5,9 @@
 struct PersistedConfig
 {
     uint16_t magic = 0x4252;
-    uint8_t version = 2;
+    uint8_t version = 3;
     uint16_t max_angle = 1080;
+    uint16_t encoder_ppr = 600;
     uint8_t gain = 25;
     uint8_t damper = 0;
     uint8_t friction = 0;

@@ -1,313 +1,365 @@
-# Firmware
+# Firmware (PT-BR)
 
-Firmware da base FFB do projeto BRSWDIY.
+Firmware do volante FFB `Apus` para `Arduino Leonardo`.
 
-**Roadmap Técnico**
-
-Vamos organizar isso como uma trilha de implementação real dentro do seu firmware, para sair do estado atual de bancada e chegar em “volante reconhecido pelo jogo + recebendo FFB + aplicando torque”.
+O projeto agora possui 4 variantes de build, separando `direction` e tipo de encoder:
 
-O repositório hoje já tem uma base boa para sensores, config e acionamento local. O que falta é encaixar a pilha de jogo em cima disso, sem misturar tudo no app.cpp.
+- `leonardo_raw_incremental`
+- `leonardo_direction_incremental`
+- `leonardo_raw_magnetic`
+- `leonardo_direction_magnetic`
 
-**Fase 1: Separar as responsabilidades do firmware**
+## Variantes
 
-Objetivo: parar de concentrar tudo em app.cpp e preparar o terreno para USB/FFB.
+- `Raw Incremental`
+  FFB sem `direction`, para encoder incremental/óptico `A/B`
+  Nome USB: `Apus Raw`
 
-Criar estas áreas novas:
+- `Direction Incremental`
+  FFB com `direction`, para encoder incremental/óptico `A/B`
+  Nome USB: `Apus Dir`
 
-- src/control/
-- src/safety/
-- src/ffb/
-- src/usb/
+- `Raw Magnetic`
+  FFB sem `direction`, com suporte a encoder magnético `AS5600`
+  Nome USB: `Apus Raw Mag`
 
-Sugestão de arquivos:
+- `Direction Magnetic`
+  FFB com `direction`, com suporte a encoder magnético `AS5600`
+  Nome USB: `Apus Dir Mag`
 
-- src/control/control_loop.h
-- src/control/control_loop.cpp
-- src/safety/safety_manager.h
-- src/safety/safety_manager.cpp
-- src/ffb/ffb_types.h
-- src/ffb/ffb_effects.h
-- src/ffb/ffb_effects.cpp
-- src/ffb/ffb_mixer.h
-- src/ffb/ffb_mixer.cpp
-- src/usb/usb_wheel.h
-- src/usb/usb_wheel.cpp
+Separar as variantes evita que a versão incremental carregue o custo de `Wire/I2C` e do suporte ao `AS5600`, o que ajuda bastante no `Arduino Leonardo`.
 
-O app.cpp vira só orquestração:
+## Requisitos
 
-- ler entradas
-- atualizar USB
-- atualizar efeitos FFB
-- rodar safety
-- calcular torque
-- aplicar no motor
+- `Python 3`
+- `PlatformIO Core`
+- `Arduino Leonardo` ou placa compatível com `ATmega32U4`
 
-**Fase 2: Fechar o modelo interno do volante**
+O core USB customizado do projeto é aplicado automaticamente pelo script [`install_brswdiy_core.py`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/scripts/install_brswdiy_core.py).
 
-Objetivo: criar as estruturas que o firmware final vai usar, mesmo antes da USB estar pronta.
+## Estrutura
 
-Hoje você já tem DeviceStatus e DeviceConfig em:
+- [`src/app`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/app): loop principal e configuração
+- [`src/ffb`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/ffb): efeitos e mixer de FFB
+- [`src/usb`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/usb): HID/PID e USB
+- [`src/proto`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/proto): protocolo serial usado pelo software
+- [`src/hw`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/hw): encoder, pedais, motor e EEPROM
+- [`core/brswdiy_avr_usb_core`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/core/brswdiy_avr_usb_core): core USB customizado
 
-- telemetry_types.h
-- config_model.h
+## Configuração do `platformio.ini`
 
-Eu sugiro adicionar:
+O arquivo [`platformio.ini`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/platformio.ini) define:
 
-- WheelInputState
-  - angle
-  - angular_velocity
-  - throttle
-  - brake
-  - clutch
-  - buttons
+- `default_envs`
+- `upload_port`
+- `monitor_port`
+- flags de build de cada variante
 
-- FfbDeviceState
-  - device_gain
-  - ffb_enabled
-  - last_ffb_packet_ms
-  - host_control_state
+Trecho atual:
 
-- MotorCommand
-  - target_torque
-  - clamped_output
-  - saturated
-  - source_flags
+```ini
+[platformio]
+default_envs = leonardo_raw_incremental
 
-- FfbEffectSlot
-  - effect_id
-  - type
-  - enabled
-  - gain
-  - duration
-  - direction
-  - magnitude
-  - offset
-  - phase
-  - period
-  - coefficient_positive
-  - coefficient_negative
-  - deadband
-  - center
+[env]
+upload_port = COM19
+monitor_port = COM18
+```
 
-Isso já elimina a dependência do g_output manual atual em app.cpp (line 399).
+Você deve ajustar principalmente:
 
-**Fase 3: Implementar a pipeline de controle**
+- `upload_port`: porta usada para gravar o firmware
+- `monitor_port`: porta do monitor serial
+- `default_envs`: variante padrão do seu fluxo local
 
-Objetivo: definir o loop final antes de ligar ao jogo.
+Para descobrir as portas no Windows:
 
-Fluxo sugerido para update_app():
+```powershell
+Get-CimInstance Win32_SerialPort | Select-Object DeviceID,Name,PNPDeviceID | Format-Table -AutoSize
+```
 
-1.  sample_inputs()
-2.  estimate_wheel_velocity()
-3.  usb_wheel_poll()
-4.  ffb_effects_update()
-5.  safety_update()
-6.  control_compute_motor_command()
-7.  motor_apply_command()
+## Como começar
 
-Aqui vale criar uma função de velocidade angular do volante, porque damper, friction e vários efeitos dependem disso. Hoje o firmware só lê posição em app.cpp (line 109).
+1. Abra esta pasta no VS Code ou no terminal.
+2. Confirme as portas no [`platformio.ini`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/platformio.ini).
+3. Escolha a variante desejada.
+4. Rode `build`, `upload` ou `monitor`.
 
-**Fase 4: Manter a serial só para debug e calibração**
+## Comandos principais
 
-Objetivo: não confundir protocolo de bancada com protocolo de jogo.
+Build da variante padrão:
 
-O módulo serial_protocol.cpp deve continuar existindo para:
+```powershell
+platformio run
+```
 
-- handshake de manutenção
-- leitura de telemetria
-- calibração
-- salvar/carregar config
-- testes manuais de motor
+Build por variante:
 
-Mas o comando FFB 0/1 atual deve ser tratado apenas como “enable local”, não como integração com jogo.
+```powershell
+platformio run -e leonardo_raw_incremental
+platformio run -e leonardo_direction_incremental
+platformio run -e leonardo_raw_magnetic
+platformio run -e leonardo_direction_magnetic
+```
 
-Sugestão:
+Upload por variante:
 
-- manter TEL, CAL, SAVE, LOAD, RESET
-- adicionar comandos de debug como:
-  - DBG FFB
-  - DBG FX
-  - DBG USB
-  - OUT  para teste manual
+```powershell
+platformio run -e leonardo_raw_incremental --target upload
+platformio run -e leonardo_direction_incremental --target upload
+platformio run -e leonardo_raw_magnetic --target upload
+platformio run -e leonardo_direction_magnetic --target upload
+```
 
-- não usar mais serial como caminho principal de FFB real
+Monitor serial:
 
-**Fase 5: Implementar o gerenciador de efeitos FFB**
+```powershell
+platformio device monitor
+```
 
-Objetivo: criar o “coração” do FFB.
+## Release para distribuição
 
-Arquivos:
+O projeto já possui um fluxo de release que gera os `.hex` prontos para distribuição.
 
-- src/ffb/ffb_effects.\*
-- src/ffb/ffb_types.h
+Script Python:
 
-Esse módulo deve:
+```powershell
+python .\scripts\build_release.py
+```
 
-- armazenar N slots de efeito
-- criar/atualizar efeitos
-- iniciar/parar efeito
-- liberar bloco
-- limpar todos
-- aplicar ganho global
-- reportar se há efeitos ativos
+Atalho PowerShell:
 
-Comece com estes tipos:
+```powershell
+.\build_release.ps1
+```
 
-- Constant Force
-- Spring
-- Damper
+Esse fluxo:
 
-Eles já permitem um MVP muito útil. Deixe para depois:
+- compila as 4 variantes
+- copia os artefatos para [`dist/`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/dist)
 
-- Sine
-- Square
-- Triangle
-- Sawtooth
-- Ramp
-- envelopes completos
+Exemplos de nomes gerados:
 
-**Fase 6: Criar o mixer de torque**
+- `apus-raw-incremental-leonardo-v0.1.0.hex`
+- `apus-dir-incremental-leonardo-v0.1.0-direction.hex`
+- `apus-raw-magnetic-leonardo-v0.1.0-mag.hex`
+- `apus-dir-magnetic-leonardo-v0.1.0-direction-mag.hex`
 
-Objetivo: converter efeitos ativos em um torque final por ciclo.
+## Onde ficam os artefatos
 
-Arquivo:
+Artefatos do PlatformIO:
 
-- src/ffb/ffb_mixer.cpp
+- [`.pio/build/leonardo_raw_incremental/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_raw_incremental/firmware.hex)
+- [`.pio/build/leonardo_direction_incremental/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_direction_incremental/firmware.hex)
+- [`.pio/build/leonardo_raw_magnetic/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_raw_magnetic/firmware.hex)
+- [`.pio/build/leonardo_direction_magnetic/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_direction_magnetic/firmware.hex)
 
-Funções esperadas:
+Artefatos de release:
 
-- compute_constant_force()
-- compute_spring_force()
-- compute_damper_force()
-- mix_all_effects()
+- [`dist/`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/dist)
 
-Lógica esperada:
+## Distribuição para usuários finais
 
-- somar contribuições dos efeitos
-- aplicar device_gain
-- aplicar config.gain
-- limitar saída
-- respeitar angle_limit
-- passar pelo safety antes de acionar motor
+Distribua os arquivos `.hex` usando ferramentas como:
 
-Isso substitui a lógica simples atual de update_motor_output() (line 136).
+- `XLoader`
+- `XLoader++`
+- `avrdude`
+- `PlatformIO`
 
-**Fase 7: Fazer o safety sair do papel**
+Ao distribuir, informe:
 
-Objetivo: impedir comportamento perigoso quando o host parar, travar ou mandar lixo.
+- placa alvo: `Arduino Leonardo`
+- variante: incremental ou magnética
+- estilo de FFB: `Raw` ou `Direction`
+- versão do firmware
 
-Arquivo:
+## Observações
 
-- src/safety/safety_manager.cpp
+- `encoder_ppr` continua existindo para encoder incremental
+- as variantes magnéticas habilitam o suporte ao `AS5600`
+- o software de configuração usa o protocolo serial em [`serial_protocol.cpp`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/proto/serial_protocol.cpp)
 
-Regras mínimas:
+---
 
-- se não chegar FFB por watchdog_ms, zerar torque
-- se USB desconectar, zerar torque
-- se ffb_enabled == false, zerar torque
-- se falha de sensor/encoder, entrar em FAULT
-- exigir safe_start antes de ativar torque
-- transição real entre READY, ACTIVE e FAULT
+# Firmware (EN)
 
-Hoje esses conceitos existem mais como config/estado do que como comportamento efetivo.
+`Apus` FFB wheel firmware for `Arduino Leonardo`.
 
-**Fase 8: Entrar na camada USB HID**
+The project now has 4 build variants, separated by `direction` mode and encoder type:
 
-Objetivo: o PC/jogo enxergar o dispositivo como volante real.
+- `leonardo_raw_incremental`
+- `leonardo_direction_incremental`
+- `leonardo_raw_magnetic`
+- `leonardo_direction_magnetic`
 
-Arquivo:
+## Variants
 
-- src/usb/usb_wheel.\*
+- `Raw Incremental`
+  FFB without `direction`, for incremental/optical `A/B` encoder
+  USB name: `Apus Raw`
 
-Aqui está o maior divisor de águas do projeto. Você vai precisar:
+- `Direction Incremental`
+  FFB with `direction`, for incremental/optical `A/B` encoder
+  USB name: `Apus Dir`
 
-- expor eixos e botões via USB HID
-- definir um HID report descriptor compatível com wheel + PID/FFB
-- receber output reports de FFB do host
-- passar esses reports para ffb_effects
+- `Raw Magnetic`
+  FFB without `direction`, with `AS5600` magnetic encoder support
+  USB name: `Apus Raw Mag`
 
-Na prática, o fluxo será:
+- `Direction Magnetic`
+  FFB with `direction`, with `AS5600` magnetic encoder support
+  USB name: `Apus Dir Mag`
 
-- jogo envia report USB
-- usb_wheel recebe
-- parser converte report em ação
-- ffb_effects atualiza slot
-- ffb_mixer calcula torque
-- motor aplica
+Separating these variants prevents the incremental build from paying the `Wire/I2C` memory cost of `AS5600` support, which is especially important on `Arduino Leonardo`.
 
-**Fase 9: Implementar o parser dos reports FFB**
+## Requirements
 
-Objetivo: ler os “packs FFB” reais do jogo.
+- `Python 3`
+- `PlatformIO Core`
+- `Arduino Leonardo` or compatible `ATmega32U4` board
 
-Sugestão de funções:
+The project custom USB core is applied automatically by [`install_brswdiy_core.py`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/scripts/install_brswdiy_core.py).
 
-- handle_device_control_report()
-- handle_device_gain_report()
-- handle_set_effect_report()
-- handle_effect_operation_report()
-- handle_set_constant_force_report()
-- handle_set_condition_report()
-- handle_block_free_report()
+## Structure
 
-Ordem recomendada:
+- [`src/app`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/app): main loop and configuration
+- [`src/ffb`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/ffb): FFB effects and mixer
+- [`src/usb`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/usb): HID/PID and USB
+- [`src/proto`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/proto): serial protocol used by the PC software
+- [`src/hw`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/hw): encoder, pedals, motor, and EEPROM
+- [`core/brswdiy_avr_usb_core`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/core/brswdiy_avr_usb_core): custom USB core
 
-1.  Device Gain
-2.  Device Control
-3.  Set Effect
-4.  Effect Operation
-5.  Constant Force
-6.  Condition para spring/damper
+## `platformio.ini` setup
 
-Essa é a menor sequência que já começa a produzir força útil em jogo.
+[`platformio.ini`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/platformio.ini) defines:
 
-**Fase 10: Evoluir o módulo do motor**
+- `default_envs`
+- `upload_port`
+- `monitor_port`
+- build flags for each variant
 
-Objetivo: sair de “PWM percentual cru” para um acionamento mais estável.
+Current example:
 
-Hoje motor.cpp faz uma ponte H simples. Para o estágio final, sugiro pelo menos:
+```ini
+[platformio]
+default_envs = leonardo_raw_incremental
 
-- mapa torque -> PWM
-- compensação de zona morta
-- rampa de subida/descida
-- saturação controlada
-- freio/zero mais previsível
+[env]
+upload_port = COM19
+monitor_port = COM18
+```
 
-Se depois houver sensor de corrente, dá para evoluir para controle de torque real. Sem isso, ainda dá para chegar num MVP funcional, mas com menos fidelidade.
+You should mainly adjust:
 
-**Fase 11: Teste por camadas**
+- `upload_port`: port used to flash the firmware
+- `monitor_port`: serial monitor port
+- `default_envs`: your default local variant
 
-Não testar tudo junto. A sequência ideal é:
+To discover ports on Windows:
 
-1.  Firmware continua compilando com serial/debug.
-2.  Volante aparece no PC como HID sem FFB.
-3.  Eixos e botões funcionam.
-4.  Output reports FFB chegam.
-5.  Device Gain altera ganho interno.
-6.  Constant Force gera torque.
-7.  Spring recentra.
-8.  Damper reage à velocidade.
-9.  Safety corta torque ao perder host.
-10. Teste em jogo real.
+```powershell
+Get-CimInstance Win32_SerialPort | Select-Object DeviceID,Name,PNPDeviceID | Format-Table -AutoSize
+```
 
-**Backlog priorizado**
+## How to start
 
-Ordem que eu seguiria no código:
+1. Open this folder in VS Code or in a terminal.
+2. Confirm the ports in [`platformio.ini`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/platformio.ini).
+3. Choose the variant you want.
+4. Run build, upload, or monitor.
 
-1.  Refatorar app.cpp para pipeline modular.
-2.  Criar tipos internos de FFB e comando de motor.
-3.  Implementar ffb_effects e ffb_mixer sem USB ainda.
-4.  Fazer teste local via serial para injetar efeitos falsos.
-5.  Implementar safety_manager.
-6.  Criar camada usb_wheel.
-7.  Adicionar HID básico de volante.
-8.  Adicionar recepção de reports FFB.
-9.  Ligar parser USB ao effect manager.
-10. Ajustar motor e tunar resposta.
+## Main commands
 
-**Marco de entrega**
+Build the default variant:
 
-Eu dividiria seu projeto em 3 marcos:
+```powershell
+platformio run
+```
 
-- M1Firmware modular, mixer funcionando, testes via serial, sem jogo ainda.
-- M2Volante HID reconhecido pelo PC, inputs funcionando, FFB chegando e Constant Force operando.
-- M3Spring, damper, watchdog, safety e ajuste fino para jogo real.
+Build by variant:
+
+```powershell
+platformio run -e leonardo_raw_incremental
+platformio run -e leonardo_direction_incremental
+platformio run -e leonardo_raw_magnetic
+platformio run -e leonardo_direction_magnetic
+```
+
+Upload by variant:
+
+```powershell
+platformio run -e leonardo_raw_incremental --target upload
+platformio run -e leonardo_direction_incremental --target upload
+platformio run -e leonardo_raw_magnetic --target upload
+platformio run -e leonardo_direction_magnetic --target upload
+```
+
+Serial monitor:
+
+```powershell
+platformio device monitor
+```
+
+## Release distribution
+
+The project already includes a release flow that generates the `.hex` files ready for distribution.
+
+Python script:
+
+```powershell
+python .\scripts\build_release.py
+```
+
+PowerShell shortcut:
+
+```powershell
+.\build_release.ps1
+```
+
+This flow:
+
+- builds all 4 variants
+- copies the artifacts to [`dist/`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/dist)
+
+Example generated names:
+
+- `apus-raw-incremental-leonardo-v0.1.0.hex`
+- `apus-dir-incremental-leonardo-v0.1.0-direction.hex`
+- `apus-raw-magnetic-leonardo-v0.1.0-mag.hex`
+- `apus-dir-magnetic-leonardo-v0.1.0-direction-mag.hex`
+
+## Where artifacts are generated
+
+PlatformIO artifacts:
+
+- [`.pio/build/leonardo_raw_incremental/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_raw_incremental/firmware.hex)
+- [`.pio/build/leonardo_direction_incremental/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_direction_incremental/firmware.hex)
+- [`.pio/build/leonardo_raw_magnetic/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_raw_magnetic/firmware.hex)
+- [`.pio/build/leonardo_direction_magnetic/firmware.hex`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/.pio/build/leonardo_direction_magnetic/firmware.hex)
+
+Release artifacts:
+
+- [`dist/`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/dist)
+
+## Distribution to end users
+
+Distribute the `.hex` files with tools such as:
+
+- `XLoader`
+- `XLoader++`
+- `avrdude`
+- `PlatformIO`
+
+When distributing, make sure to specify:
+
+- target board: `Arduino Leonardo`
+- encoder family: incremental or magnetic
+- FFB style: `Raw` or `Direction`
+- firmware version
+
+## Notes
+
+- `encoder_ppr` still exists for incremental encoders
+- magnetic variants enable `AS5600` support
+- the desktop configuration software talks to [`serial_protocol.cpp`](/c:/Users/AdamsGt/Desktop/BR-SWDIY/firmware/src/proto/serial_protocol.cpp)
