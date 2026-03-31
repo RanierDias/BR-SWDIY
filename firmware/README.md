@@ -124,7 +124,7 @@ O projeto já possui um fluxo de release que gera os `.hex` prontos para distrib
 Script Python:
 
 ```powershell
-python .\scripts\build_release.py
+python -m scripts.build_release
 ```
 
 Atalho PowerShell:
@@ -308,7 +308,7 @@ The project already includes a release flow that generates the `.hex` files read
 Python script:
 
 ```powershell
-python .\scripts\build_release.py
+python -m scripts.build_release
 ```
 
 PowerShell shortcut:

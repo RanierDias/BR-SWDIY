@@ -21,6 +21,7 @@ class AppState:
 
     angle: int = 0
     max_angle: int = 1080
+    encoder_ppr: int = 600
     output_limit: int = 75
     gain: int = 50
     damper: int = 6

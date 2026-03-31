@@ -22,7 +22,11 @@ def build_set_max_angle(value: int) -> str:
 
 
 def build_set_output_limit(value: int) -> str:
-    return f"AMX {value}"
+    return f"OUT {value}"
+
+
+def build_set_encoder_ppr(value: int) -> str:
+    return f"ENC {value}"
 
 
 def build_set_gain(value: int) -> str:

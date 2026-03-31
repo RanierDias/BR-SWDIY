@@ -14,6 +14,7 @@ class TelemetryFrame:
 @dataclass(slots=True)
 class CalibrationFrame:
     max_angle: int
+    encoder_ppr: int
     invert_pedals: bool
     motor_enable: bool
     output_limit: int
@@ -85,6 +86,7 @@ def parse_calibration(line: str) -> CalibrationFrame | None:
     try:
         return CalibrationFrame(
             max_angle=int(values["A"]),
+            encoder_ppr=int(values.get("E", "600")),
             invert_pedals=values["I"] == "1",
             output_limit=int(values["O"]),
             gain=int(values.get("G", "50")),

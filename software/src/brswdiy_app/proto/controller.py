@@ -11,6 +11,7 @@ from brswdiy_app.proto.protocol import (
     build_enable_ffb,
     build_set_max_angle,
     build_set_output_limit,
+    build_set_encoder_ppr,
     build_set_gain,
     build_set_damper,
     build_set_friction,
@@ -184,6 +185,9 @@ class Controller:
 
     def set_output_limit(self, value: int) -> None:
         self.send_command(build_set_output_limit(value))
+
+    def set_encoder_ppr(self, value: int) -> None:
+        self.send_command(build_set_encoder_ppr(value))
 
     def apply_ffb_filters(self,
                           gain: int,
