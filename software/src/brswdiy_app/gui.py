@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sys
+import tkinter as tk
+from pathlib import Path
+
 import customtkinter as ctk
 
 from brswdiy_app.state import AppState
@@ -32,6 +36,8 @@ class App(ctk.CTk):
         self.minsize(1000, 650)
 
         self.configure(fg_color=BG_MAIN)
+        self._icon_image: tk.PhotoImage | None = None
+        self._apply_window_icon()
 
         self._configure_grid()
         self._build_header()
@@ -40,6 +46,31 @@ class App(ctk.CTk):
 
         self._bind_callbacks()
         self.after(50, self._update_loop)
+
+    def _get_asset_path(self, *parts: str) -> Path:
+        if getattr(sys, "frozen", False):
+            base_path = Path(sys.executable).resolve().parent
+        else:
+            base_path = Path(__file__).resolve().parents[2]
+
+        return base_path / "assets" / Path(*parts)
+
+    def _apply_window_icon(self) -> None:
+        ico_path = self._get_asset_path("icon", "apus.ico")
+        png_path = self._get_asset_path("icon", "apus-icon.png")
+
+        if ico_path.exists():
+            try:
+                self.iconbitmap(default=str(ico_path))
+            except Exception:
+                pass
+
+        if png_path.exists():
+            try:
+                self._icon_image = tk.PhotoImage(file=str(png_path))
+                self.iconphoto(True, self._icon_image)
+            except Exception:
+                self._icon_image = None
 
     def _configure_grid(self) -> None:
         self.grid_rowconfigure(0, weight=0)
@@ -187,9 +218,9 @@ class App(ctk.CTk):
 
         self.max_angle_slider = ctk.CTkSlider(
             body,
-            from_=180,
+            from_=80,
             to=1080,
-            number_of_steps=900,
+            number_of_steps=100,
             fg_color=BG_ELEMENT,
             progress_color=ACCENT,
             button_color=ACCENT,
@@ -197,6 +228,45 @@ class App(ctk.CTk):
         )
         self.max_angle_slider.set(940)
         self.max_angle_slider.pack(fill="x", pady=(0, 14), padx=(0, 6))
+
+        encoder_title = ctk.CTkLabel(
+            body,
+            text="Encoder",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=TEXT,
+        )
+        encoder_title.pack(anchor="w", pady=(6, 0), padx=(0, 6))
+
+        encoder_box = ctk.CTkFrame(body, fg_color="transparent")
+        encoder_box.pack(fill="both", expand=False, pady=(10, 12), padx=(0, 6))
+
+        encoder_box.grid_columnconfigure(0, weight=1)
+        encoder_box.grid_columnconfigure(1, weight=1)
+        encoder_box.grid_columnconfigure(2, weight=1)
+
+        encoder_ppr_label = ctk.CTkLabel(
+            encoder_box,
+            text="Encoder PPR",
+            text_color=TEXT,
+        )
+        encoder_ppr_label.grid(row=0, column=0, sticky="w")
+
+        self.encoder_ppr_entry = ctk.CTkEntry(
+            encoder_box,
+            width=90,
+            justify="center",
+        )
+        self.encoder_ppr_entry.insert(0, "600")
+        self.encoder_ppr_entry.grid(row=0, column=1, padx=8)
+
+        self.apply_encoder_button = ctk.CTkButton(
+            encoder_box,
+            text="Apply",
+            width=72,
+            fg_color=BG_ELEMENT,
+            hover_color=ACCENT,
+        )
+        self.apply_encoder_button.grid(row=0, column=2, sticky="e")
 
         power_title = ctk.CTkLabel(
             body,
@@ -552,6 +622,7 @@ class App(ctk.CTk):
 
         self.center_button.configure(command=self._on_recenter)
         self.apply_steering_button.configure(command=self._on_apply_steering)
+        self.apply_encoder_button.configure(command=self._on_apply_encoder)
         self.apply_motor_limit_button.configure(
             command=self._on_apply_motor_limit)
         self.apply_ffb_button.configure(command=self._on_apply_ffb)
@@ -613,6 +684,33 @@ class App(ctk.CTk):
     def _on_offset_slider_change(self, label: ctk.CTkLabel, value: float) -> None:
         label.configure(text=str(int(value)))
 
+    def _set_checkbox_state(self, checkbox: ctk.CTkCheckBox, enabled: bool) -> None:
+        if enabled:
+            checkbox.select()
+        else:
+            checkbox.deselect()
+
+    def _set_calibration_controls_enabled(self, enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        widgets = (
+            self.invert_checkbox,
+            self.ffb_checkbox,
+            self.apply_steering_button,
+            self.apply_encoder_button,
+            self.apply_motor_limit_button,
+            self.apply_ffb_button,
+            self.center_button,
+            self.throttle_set_min_button,
+            self.throttle_set_max_button,
+            self.brake_set_min_button,
+            self.brake_set_max_button,
+            self.clutch_set_min_button,
+            self.clutch_set_max_button,
+        )
+
+        for widget in widgets:
+            widget.configure(state=state)
+
     def _on_switch(self) -> None:
         self.status_label.configure(text="Searching...")
 
@@ -621,6 +719,8 @@ class App(ctk.CTk):
             self.app_state.connected = False
             self.app_state.detected_port = None
             self.app_state.status_text = "Disconnected"
+            self.app_state.invert_pedals = False
+            self._set_checkbox_state(self.invert_checkbox, False)
             self.switch_button.configure(text="Connect")
             self.switch_button.configure(hover_color=ACCENT_SOFT)
             self.status_label.configure(text=self.app_state.status_text)
@@ -644,6 +744,7 @@ class App(ctk.CTk):
             self.switch_button.configure(
                 text="Disconnect", hover_color=BG_MAIN)
 
+            self._set_calibration_controls_enabled(False)
             self._read_calibration_into_ui()
 
         except Exception as exc:
@@ -691,10 +792,12 @@ class App(ctk.CTk):
         frame = self.controller.read_calibration()
 
         if not frame:
+            self._set_calibration_controls_enabled(True)
             self.res_label.configure(text="Don't loaded config")
             return
 
         self.app_state.max_angle = frame.max_angle
+        self.app_state.encoder_ppr = frame.encoder_ppr
         self.app_state.output_limit = frame.output_limit
         self.app_state.gain = frame.gain
         self.app_state.damper = frame.damper
@@ -717,6 +820,8 @@ class App(ctk.CTk):
 
         self.max_angle_slider.set(self.app_state.max_angle)
         self.max_angle_value.configure(text=str(self.app_state.max_angle))
+        self.encoder_ppr_entry.delete(0, "end")
+        self.encoder_ppr_entry.insert(0, str(self.app_state.encoder_ppr))
         self.output_limit_slider.set(self.app_state.output_limit)
         self.output_limit_value.configure(
             text=str(self.app_state.output_limit))
@@ -731,8 +836,9 @@ class App(ctk.CTk):
         self.spring_slider.set(self.app_state.spring)
         self.spring_value_label.configure(text=str(self.app_state.spring))
 
-        self.invert_checkbox.select() if frame.invert_pedals else self.invert_checkbox.deselect()
-        self.ffb_checkbox.select() if frame.motor_enable else self.ffb_checkbox.deselect()
+        self._set_checkbox_state(self.invert_checkbox, frame.invert_pedals)
+        self._set_checkbox_state(self.ffb_checkbox, frame.motor_enable)
+        self._set_calibration_controls_enabled(True)
 
     def _on_apply_steering(self) -> None:
         if not self.controller.is_connected():
@@ -759,6 +865,20 @@ class App(ctk.CTk):
 
             self.app_state.output_limit = output_limit
             self.res_label.configure(text="Motor limit applied")
+
+        except Exception as exc:
+            self.app_state.last_error = str(exc)
+            self.res_label.configure(text=f"Error: {exc}")
+
+    def _on_apply_encoder(self) -> None:
+        if not self.controller.is_connected():
+            return
+
+        try:
+            encoder_ppr = int(self.encoder_ppr_entry.get())
+            self.controller.set_encoder_ppr(encoder_ppr)
+            self.app_state.encoder_ppr = encoder_ppr
+            self.res_label.configure(text="Encoder PPR applied")
 
         except Exception as exc:
             self.app_state.last_error = str(exc)
@@ -809,6 +929,7 @@ class App(ctk.CTk):
             enabled = self.invert_checkbox.get() == 1
             self.controller.set_invert_pedals(enabled)
             self.app_state.invert_pedals = enabled
+            self._set_checkbox_state(self.invert_checkbox, enabled)
             self.res_label.configure(text="Invert updated")
 
         except Exception as exc:
@@ -823,6 +944,7 @@ class App(ctk.CTk):
             enabled = self.ffb_checkbox.get() == 1
             self.controller.set_ffb_enable(enabled)
             self.app_state.ffb_enabled = enabled
+            self._set_checkbox_state(self.ffb_checkbox, enabled)
             self.res_label.configure(text="FFB updated")
 
         except Exception as exc:
@@ -844,7 +966,7 @@ class App(ctk.CTk):
 
         try:
             current, offset = self._get_pedal_current_and_offset(pedal_name)
-            inverted = self.invert_checkbox.get() == 1
+            inverted = self.app_state.invert_pedals
             pedal_state = getattr(self.app_state, pedal_name)
 
             if target == "min":
@@ -893,11 +1015,13 @@ class App(ctk.CTk):
 
         try:
             self.res_label.configure(text="Loading...")
+            self._set_calibration_controls_enabled(False)
             self.controller.load()
-            self.after(50, self._read_calibration_into_ui)
+            self.after(150, self._read_calibration_into_ui)
             self.res_label.configure(text="Loaded from device")
 
         except Exception as exc:
+            self._set_calibration_controls_enabled(True)
             self.app_state.last_error = str(exc)
             self.res_label.configure(text=f"Error: {exc}")
 
@@ -906,10 +1030,14 @@ class App(ctk.CTk):
             return
 
         try:
+            self._set_calibration_controls_enabled(False)
             self.controller.reset_default()
-            self.after(50, self._read_calibration_into_ui)
+            self.app_state.invert_pedals = False
+            self._set_checkbox_state(self.invert_checkbox, False)
+            self.after(150, self._read_calibration_into_ui)
             self.res_label.configure(text="Defaults restored")
 
         except Exception as exc:
+            self._set_calibration_controls_enabled(True)
             self.app_state.last_error = str(exc)
             self.res_label.configure(text=f"Error: {exc}")

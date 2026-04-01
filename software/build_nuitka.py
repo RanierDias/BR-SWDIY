@@ -10,6 +10,8 @@ def main() -> int:
     project_root = Path(__file__).resolve().parent
     src_root = project_root / "src"
     main_script = src_root / "brswdiy_app" / "main.py"
+    icon_ico = project_root / "assets" / "icon" / "apus.ico"
+    icon_png = project_root / "assets" / "icon" / "apus-icon.png"
     output_dir = project_root / "dist"
     build_dir = project_root / "build" / "nuitka"
     cache_dir = build_dir / "cache"
@@ -27,10 +29,17 @@ def main() -> int:
         "--enable-plugin=tk-inter",
         "--assume-yes-for-downloads",
         "--windows-console-mode=disable",
+        "--windows-icon-from-ico=" + str(icon_ico),
         "--output-dir=" + str(output_dir),
         "--remove-output",
         "--disable-cache=dll-dependencies",
         "--nofollow-import-to=pytest,setuptools,wheel,black,ruff",
+        "--include-data-file="
+        + str(icon_ico)
+        + "=assets/icon/apus.ico",
+        "--include-data-file="
+        + str(icon_png)
+        + "=assets/icon/apus-icon.png",
         "--company-name=BRSWDIY",
         "--product-name=Apus Utility",
         "--file-version=0.1.0.0",

@@ -5,6 +5,14 @@
 namespace
 {
     constexpr uint8_t MAX_EFFECT_SLOTS = 8;
+#ifndef FFB_DIRECTION_ENABLED
+#define FFB_DIRECTION_ENABLED 0
+#endif
+
+#if FFB_DIRECTION_ENABLED
+    constexpr uint8_t DIRECTION_MIN_SCALE_PERCENT = 30;
+    constexpr uint8_t DIRECTION_AXIS_DEADBAND = 6;
+#endif
     static int8_t SINE_WAVE_TABLE[256] = {
         0, 3, 6, 9, 12, 15, 18, 21, 24, 28, 31, 34, 37, 40, 43, 46,
         48, 51, 54, 57, 60, 63, 65, 68, 71, 73, 76, 78, 81, 83, 85, 88,
@@ -75,23 +83,59 @@ namespace
     int16_t sample_periodic_wave(const FfbPeriodic &periodic, uint32_t elapsed_ms)
     {
         const uint16_t period_ms = (periodic.period_ms == 0) ? 1 : periodic.period_ms;
+        const uint32_t phase = ((elapsed_ms % period_ms) * 8192UL / period_ms +
+                                (static_cast<uint32_t>(periodic.phase % 36000U) * 8192UL) / 36000UL) &
+                               0x1FFFU;
 
-        const uint32_t elapsed_phase = (elapsed_ms % period_ms) * 8192UL / period_ms;
-        const uint32_t phase_offset = (static_cast<uint32_t>(periodic.phase % 36000U) * 8192UL) / 36000UL;
-        const uint16_t phase = static_cast<uint16_t>((elapsed_phase + phase_offset) & 0x1FFFU);
-
-        const uint8_t index = static_cast<uint8_t>(phase >> 5);
-        const uint8_t next_index = static_cast<uint8_t>((index + 1U) & 0xFFU);
-        const uint8_t fraction = static_cast<uint8_t>(phase & 0x1FU); // Resto de 5 bits (0-31)
-
-        const int16_t a = SINE_WAVE_TABLE[index];
-        const int16_t b = SINE_WAVE_TABLE[next_index];
-
-        const int16_t interpolated = static_cast<int16_t>(
-            a + ((static_cast<int32_t>(b - a) * fraction) >> 5));
+        const uint8_t idx = phase >> 5;
+        const uint8_t next = (idx + 1) & 0xFF;
+        const uint8_t frac = phase & 0x1F;
+        const int16_t sample = static_cast<int16_t>(
+            SINE_WAVE_TABLE[idx] + ((static_cast<int32_t>(SINE_WAVE_TABLE[next] - SINE_WAVE_TABLE[idx]) * frac) >> 5));
 
         return static_cast<int16_t>(
-            periodic.offset + ((static_cast<int32_t>(interpolated) * periodic.magnitude) / 127L));
+            periodic.offset + ((static_cast<int32_t>(sample) * periodic.magnitude) / 127L));
+    }
+
+    int16_t apply_direction(const FfbEffectSlot &slot, int16_t effect_force)
+    {
+#if FFB_DIRECTION_ENABLED
+        const int16_t magnitude = abs(effect_force);
+        if (magnitude == 0)
+        {
+            return 0;
+        }
+
+        const uint32_t wrapped = static_cast<uint32_t>(slot.direction % 36000U);
+        const uint32_t phase = (wrapped * 8192UL) / 36000UL;
+        const uint16_t cosine_phase = static_cast<uint16_t>((phase + 2048U) & 0x1FFFU);
+        const uint8_t idx = cosine_phase >> 5;
+        const uint8_t next = (idx + 1) & 0xFF;
+        const uint8_t frac = cosine_phase & 0x1F;
+        const int8_t axis_projection = static_cast<int8_t>(
+            SINE_WAVE_TABLE[idx] + ((static_cast<int32_t>(SINE_WAVE_TABLE[next] - SINE_WAVE_TABLE[idx]) * frac) >> 5));
+        const int16_t projection_abs = abs(axis_projection);
+        if (projection_abs <= DIRECTION_AXIS_DEADBAND)
+        {
+            return effect_force;
+        }
+
+        int16_t direction_scale = static_cast<int16_t>(
+            (static_cast<int32_t>(projection_abs) * 100L) / 127L);
+        if (direction_scale < DIRECTION_MIN_SCALE_PERCENT)
+        {
+            direction_scale = DIRECTION_MIN_SCALE_PERCENT;
+        }
+        const int16_t directed_magnitude = static_cast<int16_t>(
+            (static_cast<int32_t>(magnitude) * direction_scale) / 100L);
+        const int8_t base_sign = (effect_force >= 0) ? 1 : -1;
+        const int8_t axis_sign = (axis_projection >= 0) ? 1 : -1;
+
+        return static_cast<int16_t>(directed_magnitude * base_sign * axis_sign);
+#else
+        (void)slot;
+        return effect_force;
+#endif
     }
 
     int16_t apply_envelope(const FfbEffectSlot &slot, int16_t value, uint32_t elapsed_ms)
@@ -317,7 +361,6 @@ bool ffb_update_effect_parameters(uint8_t effect_id,
                                   int16_t direction,
                                   uint16_t start_delay_ms)
 {
-    (void)direction;
     FfbEffectSlot *slot = find_slot(effect_id);
 
     if (slot == nullptr)
@@ -328,6 +371,7 @@ bool ffb_update_effect_parameters(uint8_t effect_id,
     slot->gain = constrain(gain_percent, 0, 100);
     slot->duration_ms = duration_ms;
     slot->start_delay_ms = start_delay_ms;
+    slot->direction = static_cast<uint16_t>(direction);
     return true;
 }
 
@@ -601,13 +645,13 @@ int16_t ffb_compute_base_force(const WheelInputState &input)
         if (slot.type == FfbEffectType::ConstantForce)
         {
             int16_t base = apply_envelope(slot, slot.magnitude, elapsed_ms);
-            effect_force = base;
+            effect_force = apply_direction(slot, base);
         }
         else if (slot.type == FfbEffectType::Sine)
         {
             int16_t periodic = sample_periodic_wave(slot.periodic, elapsed_ms);
             int16_t shaped = apply_envelope(slot, periodic, elapsed_ms);
-            effect_force = shaped;
+            effect_force = apply_direction(slot, shaped);
         }
         else if (slot.type == FfbEffectType::Ramp)
         {
@@ -618,7 +662,7 @@ int16_t ffb_compute_base_force(const WheelInputState &input)
                 ramp_raw += static_cast<int16_t>((delta * static_cast<int32_t>(elapsed_ms)) / slot.duration_ms);
             }
             int16_t shaped = apply_envelope(slot, constrain(ramp_raw, -100, 100), elapsed_ms);
-            effect_force = shaped;
+            effect_force = apply_direction(slot, shaped);
         }
 
         else if (slot.type == FfbEffectType::Spring)

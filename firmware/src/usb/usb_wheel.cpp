@@ -271,7 +271,7 @@ namespace
 
     uint16_t steering_to_hid(int16_t angle)
     {
-        int32_t max_counts = static_cast<int32_t>(get_max_angle()) * 10L / 3L;
+        int32_t max_counts = static_cast<int32_t>(get_half_angle_counts());
         if (max_counts <= 0)
         {
             max_counts = 1200;
@@ -311,13 +311,16 @@ namespace
     uint16_t compute_ram_pool_available()
     {
         const uint8_t total = ffb_get_max_effect_slots();
-        if (total == 0)
-        {
-            return 0;
-        }
+        const uint8_t used_slots = ffb_get_allocated_effect_count();
+        const uint8_t free_slots = (used_slots >= total) ? 0 : static_cast<uint8_t>(total - used_slots);
+        const uint16_t bytes_per_effect = static_cast<uint16_t>(sizeof(FfbEffectSlot));
 
-        const uint8_t free_slots = static_cast<uint8_t>(total - ffb_get_allocated_effect_count());
-        return static_cast<uint16_t>((static_cast<uint32_t>(free_slots) * 0xFFFFUL) / total);
+        return static_cast<uint16_t>(free_slots * bytes_per_effect);
+    }
+
+    uint16_t compute_ram_pool_size()
+    {
+        return static_cast<uint16_t>(ffb_get_max_effect_slots() * sizeof(FfbEffectSlot));
     }
 
     FfbEffectType decode_effect_type(uint8_t raw_type)
@@ -827,7 +830,7 @@ namespace
         {
             const PoolFeatureReport report = {
                 PID_POOL_REPORT_ID,
-                0xFFFF,
+                compute_ram_pool_size(),
                 ffb_get_max_effect_slots(),
                 0x03};
             send_feature_report(&report, sizeof(report));

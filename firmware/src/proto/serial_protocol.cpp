@@ -64,6 +64,9 @@ namespace
       Serial.print(F(" I="));
       Serial.print(calibration.invert_pedals ? 1 : 0);
 
+      Serial.print(F(" E="));
+      Serial.print(config.encoder_ppr);
+
       Serial.print(F(" O="));
       Serial.print(config.output_limit);
 
@@ -236,6 +239,23 @@ namespace
       else
       {
         write_error(3, "INVALID_RANGE", "ANG");
+      }
+
+      return;
+    }
+
+    if (strncmp(raw, "ENC ", 4) == 0)
+    {
+      const int value = atoi(raw + 4);
+
+      if (set_encoder_ppr(value))
+      {
+        Serial.print(F("OK ENC="));
+        Serial.println(value);
+      }
+      else
+      {
+        write_error(3, "INVALID_RANGE", "ENC");
       }
 
       return;
