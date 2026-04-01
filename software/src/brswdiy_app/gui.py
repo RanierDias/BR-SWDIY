@@ -48,12 +48,13 @@ class App(ctk.CTk):
         self.after(50, self._update_loop)
 
     def _get_asset_path(self, *parts: str) -> Path:
-        if getattr(sys, "frozen", False):
-            base_path = Path(sys.executable).resolve().parent
-        else:
-            base_path = Path(__file__).resolve().parents[2]
+        module_base = Path(__file__).resolve().parents[2]
+        asset_path = module_base / "assets" / Path(*parts)
 
-        return base_path / "assets" / Path(*parts)
+        if asset_path.exists():
+            return asset_path
+
+        return Path(sys.executable).resolve().parent / "assets" / Path(*parts)
 
     def _apply_window_icon(self) -> None:
         ico_path = self._get_asset_path("icon", "apus.ico")
@@ -201,7 +202,7 @@ class App(ctk.CTk):
 
         self.max_angle_value = ctk.CTkLabel(
             angle_box,
-            text="1080",
+            text="900",
             text_color=TEXT
         )
         self.max_angle_value.grid(row=0, column=1)
@@ -226,8 +227,49 @@ class App(ctk.CTk):
             button_color=ACCENT,
             button_hover_color=ACCENT,
         )
-        self.max_angle_slider.set(940)
+        self.max_angle_slider.set(900)
         self.max_angle_slider.pack(fill="x", pady=(0, 14), padx=(0, 6))
+
+        ffb_filters = ctk.CTkFrame(
+            body,
+            fg_color=BG_ELEMENT,
+            corner_radius=8,
+            border_width=1,
+            border_color=BORDER,
+        )
+        ffb_filters.pack(fill="x", pady=(0, 16), padx=(0, 6))
+
+        ffb_title = ctk.CTkLabel(
+            ffb_filters,
+            text="FFB Filters",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=TEXT,
+        )
+        ffb_title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        self.gain_slider, self.gain_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Gain", 0, 100, 100, 50
+        )
+        self.damper_slider, self.damper_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Damper", 0, 100, 100, 6
+        )
+        self.friction_slider, self.friction_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Friction", 0, 100, 100, 2
+        )
+        self.inertia_slider, self.inertia_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Inertia", 0, 100, 100, 2
+        )
+        self.spring_slider, self.spring_value_label = self._create_ffb_slider_row(
+            ffb_filters, "Spring", 0, 100, 100, 0
+        )
+
+        self.apply_ffb_button = ctk.CTkButton(
+            ffb_filters,
+            text="Apply FFB",
+            fg_color=ACCENT,
+            hover_color=ACCENT_SOFT,
+        )
+        self.apply_ffb_button.pack(fill="x", padx=10, pady=(12, 10))
 
         encoder_title = ctk.CTkLabel(
             body,
@@ -255,6 +297,9 @@ class App(ctk.CTk):
             encoder_box,
             width=90,
             justify="center",
+            fg_color=BG_MAIN,
+            text_color=TEXT,
+            border_color=BG_ELEMENT
         )
         self.encoder_ppr_entry.insert(0, "600")
         self.encoder_ppr_entry.grid(row=0, column=1, padx=8)
@@ -319,47 +364,6 @@ class App(ctk.CTk):
         )
         self.output_limit_slider.set(75)
         self.output_limit_slider.pack(fill="x", pady=(0, 18), padx=(0, 6))
-
-        ffb_filters = ctk.CTkFrame(
-            body,
-            fg_color=BG_ELEMENT,
-            corner_radius=8,
-            border_width=1,
-            border_color=BORDER,
-        )
-        ffb_filters.pack(fill="x", pady=(0, 16), padx=(0, 6))
-
-        ffb_title = ctk.CTkLabel(
-            ffb_filters,
-            text="FFB Filters",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=TEXT,
-        )
-        ffb_title.pack(anchor="w", padx=10, pady=(8, 4))
-
-        self.gain_slider, self.gain_value_label = self._create_ffb_slider_row(
-            ffb_filters, "Gain", 0, 100, 100, 50
-        )
-        self.damper_slider, self.damper_value_label = self._create_ffb_slider_row(
-            ffb_filters, "Damper", 0, 100, 100, 6
-        )
-        self.friction_slider, self.friction_value_label = self._create_ffb_slider_row(
-            ffb_filters, "Friction", 0, 100, 100, 2
-        )
-        self.inertia_slider, self.inertia_value_label = self._create_ffb_slider_row(
-            ffb_filters, "Inertia", 0, 100, 100, 2
-        )
-        self.spring_slider, self.spring_value_label = self._create_ffb_slider_row(
-            ffb_filters, "Spring", 0, 100, 100, 0
-        )
-
-        self.apply_ffb_button = ctk.CTkButton(
-            ffb_filters,
-            text="Apply FFB",
-            fg_color=ACCENT,
-            hover_color=ACCENT_SOFT,
-        )
-        self.apply_ffb_button.pack(fill="x", padx=10, pady=(12, 10))
 
     def _create_ffb_slider_row(
         self,
