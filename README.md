@@ -100,6 +100,8 @@ O pacote `.zip` de release e organizado em tres pastas:
 - `Software/`
   Contem o executavel `.exe` da GUI **Apus Utility**.
 
+##### [Baixar Pacote](https://github.com/RanierDias/BR-SWDIY/releases/download/Apus/BRSWDIY.zip) / [Conferir Versão](https://github.com/RanierDias/BR-SWDIY/releases/tag/Apus)
+
 ### Como usar o pacote `.zip`
 
 #### 1. Instalar o firmware
@@ -226,6 +228,8 @@ The release `.zip` package is organized into three folders:
 
 - `Software/`
   Contains the `.exe` build of the **Apus Utility** GUI.
+
+##### [Download Package](https://github.com/RanierDias/BR-SWDIY/releases/download/Apus/BRSWDIY.zip) / [Check Version](https://github.com/RanierDias/BR-SWDIY/releases/tag/Apus)
 
 ### How to use the `.zip` package
 
