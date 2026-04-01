@@ -15,6 +15,7 @@
 #include "hw/pedals.h"
 #include "hw/encoder.h"
 #include "hw/motor.h"
+#include "hw/buttons.h"
 #include "hw/eeprom_store.h"
 #include "usb/usb_wheel.h"
 
@@ -145,6 +146,11 @@ static void update_pedals()
   g_status.clutch = normalize_pedal(read_clutch_raw(), g_input_calibration.clutch);
 }
 
+static void update_buttons()
+{
+  g_status.buttons = read_buttons();
+}
+
 static void update_encoder()
 {
   g_status.angle = get_encoder_position() - g_encoder_zero_offset;
@@ -226,6 +232,7 @@ void setup_app()
   setup_pedals();
   setup_encoder();
   setup_motor();
+  setup_buttons();
   setup_control_loop();
   setup_ffb_effects();
   setup_safety_manager();
@@ -247,6 +254,7 @@ void update_app()
 
   update_encoder();
   update_pedals();
+  update_buttons();
   refresh_control_state(now);
   update_motor_output();
   update_usb_wheel();
