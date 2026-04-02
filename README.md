@@ -135,6 +135,14 @@ Este projeto existe gracas ao trabalho de base de:
 
 Muito obrigado por tornarem esse tipo de projeto possivel.
 
+### Me ajude a montar meu primeiro DD Diy.
+
+Estou tentando fazer meu primeiro projeto usando motor hoverboard.
+
+Pix: ranierfernandodias@gmail.com
+
+Prometo retirar secao assim que alcançar a meta - R$ 1.500,00
+
 ## EN
 
 ### Overview
