@@ -100,7 +100,7 @@ O pacote `.zip` de release e organizado em tres pastas:
 - `Software/`
   Contem o executavel `.exe` da GUI **Apus Utility**.
 
-##### [Baixar Pacote](https://github.com/RanierDias/BR-SWDIY/releases/download/v0.2.0/BRSWDIY.zip) / [Conferir Versão](https://github.com/RanierDias/BR-SWDIY/releases)
+##### [Baixar Pacote](https://github.com/RanierDias/BR-SWDIY/releases/download/v0.2.1-beta/BRSWDIY.zip) / [Conferir Versão](https://github.com/RanierDias/BR-SWDIY/releases)
 
 ### Como usar o pacote `.zip`
 
@@ -237,7 +237,7 @@ The release `.zip` package is organized into three folders:
 - `Software/`
   Contains the `.exe` build of the **Apus Utility** GUI.
 
-##### [Download Package](https://github.com/RanierDias/BR-SWDIY/releases/download/v0.2.0/BRSWDIY.zip) / [Check Version](https://github.com/RanierDias/BR-SWDIY/releases)
+##### [Download Package](https://github.com/RanierDias/BR-SWDIY/releases/download/v0.2.1-beta/BRSWDIY.zip) / [Check Version](https://github.com/RanierDias/BR-SWDIY/releases)
 
 ### How to use the `.zip` package
 
