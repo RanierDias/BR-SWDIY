@@ -90,31 +90,31 @@ Get-CimInstance Win32_SerialPort | Select-Object DeviceID,Name,PNPDeviceID | For
 Build da variante padrão:
 
 ```powershell
-platformio run
+pio run
 ```
 
 Build por variante:
 
 ```powershell
-platformio run -e leonardo_raw_incremental
-platformio run -e leonardo_direction_incremental
-platformio run -e leonardo_raw_magnetic
-platformio run -e leonardo_direction_magnetic
+pio run -e leonardo_raw_incremental
+pio run -e leonardo_direction_incremental
+pio run -e leonardo_raw_magnetic
+pio run -e leonardo_direction_magnetic
 ```
 
 Upload por variante:
 
 ```powershell
-platformio run -e leonardo_raw_incremental --target upload
-platformio run -e leonardo_direction_incremental --target upload
-platformio run -e leonardo_raw_magnetic --target upload
-platformio run -e leonardo_direction_magnetic --target upload
+pio run -e leonardo_raw_incremental -t upload
+pio run -e leonardo_direction_incremental -t upload
+pio run -e leonardo_raw_magnetic -t upload
+pio run -e leonardo_direction_magnetic -t upload
 ```
 
 Monitor serial:
 
 ```powershell
-platformio device monitor
+pio device monitor
 ```
 
 ## Release para distribuição
@@ -274,31 +274,31 @@ Get-CimInstance Win32_SerialPort | Select-Object DeviceID,Name,PNPDeviceID | For
 Build the default variant:
 
 ```powershell
-platformio run
+pio run
 ```
 
 Build by variant:
 
 ```powershell
-platformio run -e leonardo_raw_incremental
-platformio run -e leonardo_direction_incremental
-platformio run -e leonardo_raw_magnetic
-platformio run -e leonardo_direction_magnetic
+pio run -e leonardo_raw_incremental
+pio run -e leonardo_direction_incremental
+pio run -e leonardo_raw_magnetic
+pio run -e leonardo_direction_magnetic
 ```
 
 Upload by variant:
 
 ```powershell
-platformio run -e leonardo_raw_incremental --target upload
-platformio run -e leonardo_direction_incremental --target upload
-platformio run -e leonardo_raw_magnetic --target upload
-platformio run -e leonardo_direction_magnetic --target upload
+pio run -e leonardo_raw_incremental -t upload
+pio run -e leonardo_direction_incremental -t upload
+pio run -e leonardo_raw_magnetic -t upload
+pio run -e leonardo_direction_magnetic -t upload
 ```
 
 Serial monitor:
 
 ```powershell
-platformio device monitor
+pio device monitor
 ```
 
 ## Release distribution
