@@ -78,8 +78,6 @@ namespace
     constexpr uint8_t EFFECT_TYPE_FRICTION_USAGE = 0x43;
 
     constexpr uint32_t INPUT_REPORT_INTERVAL_MS = 2;
-    constexpr uint32_t STATUS_REPORT_INTERVAL_MS = 20;
-
     struct __attribute__((packed)) SetEffectOutputReport
     {
         uint8_t report_id;
@@ -211,7 +209,6 @@ namespace
     BlockLoadFeatureReport g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
     UsbFfbRuntimeStatus g_runtime_status;
     uint32_t g_last_input_report_ms = 0;
-    uint32_t g_last_status_report_ms = 0;
     bool g_usb_session_active = false;
 
     template <typename T>
@@ -434,24 +431,21 @@ namespace
         g_last_input_snapshot = SentInputSnapshot{};
         g_last_status_payload = PidStatusPayload{};
         g_last_input_report_ms = 0;
-        g_last_status_report_ms = 0;
         g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
     }
 
-    void send_pid_status_if_needed(uint32_t now_ms, bool force)
+    void send_pid_status_if_needed(bool force)
     {
         const PidStatusPayload payload = build_status_payload();
         if (!force &&
             payload.status == g_last_status_payload.status &&
-            payload.effect_block_index == g_last_status_payload.effect_block_index &&
-            (now_ms - g_last_status_report_ms) < STATUS_REPORT_INTERVAL_MS)
+            payload.effect_block_index == g_last_status_payload.effect_block_index)
         {
             return;
         }
 
         HID_SendReport(PID_STATE_REPORT_ID, &payload, sizeof(payload));
         g_last_status_payload = payload;
-        g_last_status_report_ms = now_ms;
     }
 
     void send_input_report_if_needed(uint32_t now_ms)
@@ -672,7 +666,7 @@ namespace
             {
                 ffb_set_enabled(true, now_ms);
             }
-            ffb_start_effect(report.effect_block_index, now_ms, report.loop_count == 0 ? 1 : report.loop_count);
+            ffb_start_effect(report.effect_block_index, now_ms, report.loop_count);
             break;
         case EFFECT_OP_START_SOLO:
             if (!ffb_is_enabled())
@@ -680,7 +674,7 @@ namespace
                 ffb_set_enabled(true, now_ms);
             }
             stop_other_effects(report.effect_block_index);
-            ffb_start_effect(report.effect_block_index, now_ms, report.loop_count == 0 ? 1 : report.loop_count);
+            ffb_start_effect(report.effect_block_index, now_ms, report.loop_count);
             break;
         case EFFECT_OP_STOP:
             ffb_stop_effect(report.effect_block_index);
@@ -955,11 +949,11 @@ void update_usb_wheel()
     {
         g_usb_session_active = true;
         ffb_set_host_connection(true, now_ms);
-        send_pid_status_if_needed(now_ms, true);
+        send_pid_status_if_needed(true);
     }
 
     send_input_report_if_needed(now_ms);
-    send_pid_status_if_needed(now_ms, false);
+    send_pid_status_if_needed(false);
 }
 
 bool usb_wheel_ready()
