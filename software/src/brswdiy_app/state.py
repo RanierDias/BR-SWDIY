@@ -8,6 +8,8 @@ class PedalState:
     current: int = 0
     minimum: int = 0
     maximum: int = 1023
+    calibration_min: int = 0
+    calibration_max: int = 1023
 
     min_offset: int = 0
     max_offset: int = 0

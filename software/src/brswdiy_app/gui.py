@@ -775,9 +775,10 @@ class App(ctk.CTk):
         self.after(30, self._update_loop)
 
     def _refresh_live_monitor(self) -> None:
-        throttle = self.app_state.throttle.current / self.app_state.throttle.maximum
-        brake = self.app_state.brake.current / self.app_state.brake.maximum
-        clutch = self.app_state.clutch.current / self.app_state.clutch.maximum
+        telemetry_scale = 1023
+        throttle = self.app_state.throttle.current / telemetry_scale
+        brake = self.app_state.brake.current / telemetry_scale
+        clutch = self.app_state.clutch.current / telemetry_scale
 
         self.angle_value_label.configure(text=f"{self.app_state.angle}°")
 
@@ -814,13 +815,19 @@ class App(ctk.CTk):
         self.app_state.ffb_enabled = frame.motor_enable
 
         self.app_state.throttle.minimum = 0
-        self.app_state.throttle.maximum = 1023 if frame.throttle_max < 1024 else 4095 if frame.throttle_max < 4096 else 65535
+        self.app_state.throttle.maximum = 1023
+        self.app_state.throttle.calibration_min = frame.throttle_min
+        self.app_state.throttle.calibration_max = frame.throttle_max
 
         self.app_state.brake.minimum = 0
-        self.app_state.brake.maximum = 1023 if frame.brake_max < 1024 else 4095 if frame.brake_max < 4096 else 65535
+        self.app_state.brake.maximum = 1023
+        self.app_state.brake.calibration_min = frame.brake_min
+        self.app_state.brake.calibration_max = frame.brake_max
 
         self.app_state.clutch.minimum = 0
-        self.app_state.clutch.maximum = 1023 if frame.clutch_max < 1024 else 4095 if frame.clutch_max < 4096 else 65535
+        self.app_state.clutch.maximum = 1023
+        self.app_state.clutch.calibration_min = frame.clutch_min
+        self.app_state.clutch.calibration_max = frame.clutch_max
 
         self.max_angle_slider.set(self.app_state.max_angle)
         self.max_angle_value.configure(text=str(self.app_state.max_angle))
@@ -955,12 +962,25 @@ class App(ctk.CTk):
             self.app_state.last_error = str(exc)
             self.res_label.configure(text=f"Error: {exc}")
 
+    def _normalize_to_raw(self, pedal_state) -> int:
+        range_raw = pedal_state.calibration_max - pedal_state.calibration_min
+        if range_raw <= 0:
+            return pedal_state.current
+
+        normalized = max(0, min(1023, pedal_state.current))
+
+        return int(
+            pedal_state.calibration_min
+            + (normalized * range_raw) / 1023
+        )
+
     def _get_pedal_current_and_offset(self, pedal_name: str) -> tuple[int, int]:
         pedal_state = getattr(self.app_state, pedal_name)
         slider = getattr(self, f"{pedal_name}_offset_slider")
 
-        current_raw = pedal_state.current
-        offset = int(slider.get() * pedal_state.maximum / 100)
+        current_raw = self._normalize_to_raw(pedal_state)
+        full_scale = max(pedal_state.calibration_max, 1023)
+        offset = int(slider.get() * full_scale / 100)
 
         return current_raw, offset
 
@@ -970,15 +990,15 @@ class App(ctk.CTk):
 
         try:
             current, offset = self._get_pedal_current_and_offset(pedal_name)
-            inverted = self.app_state.invert_pedals
             pedal_state = getattr(self.app_state, pedal_name)
 
             if target == "min":
-                value = (current + offset) if not inverted else (current - offset)
+                value = current + offset
             else:
-                value = (current - offset) if not inverted else (current + offset)
+                value = current - offset
 
-            value = max(0, min(pedal_state.maximum, value))
+            full_scale = max(pedal_state.calibration_max, 1023)
+            value = max(0, min(full_scale, value))
 
             self._apply_pedal_value(pedal_name, target, value)
 
