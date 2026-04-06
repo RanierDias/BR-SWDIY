@@ -6,6 +6,20 @@ Lightweight and modular force feedback wheel project based on the Arduino Leonar
 
 Projeto de volante com force feedback leve e modular baseado em Arduino Leonardo, projetado para funcionar com baixo overhead e sem depender da GUI durante o uso.
 
+## Aviso / Notice
+
+O projeto BRSWDIY chegou ao fim apos uma sequência de obstaculos que, somados, tornaram sua continuidade inviavel. Desde o inicio, enfrentei problemas relacionados a memoria expansiva na reparticao de disco onde os jogos estavam instalados por um PID extremamente fragil criado pela minha parte, o que gerava inconsistências e dificultava o funcionamento estavel do sistema. Mesmo apos diversas tentativas de contornar essas limitacoes, a falta de experiencia e conhecimento mais aprofundado acabou agravando a situaçao.
+
+Durante esse processo, uma tentativa de ajuste acabou comprometendo o funcionamento do Arduino Leonardo, que passou a apresentar falha na porta USB, impossibilitando qualquer forma de comunicação ou regravação direta. Sem outro Arduino disponivel para realizar um possivel reflash ou recuperação via ISP, o dispositivo ficou inutilizado.
+
+Ao mesmo tempo, ao compreender melhor as limitações da arquitetura utilizada e as dificuldades inerentes ao suporte de force feedback nesse contexto, ficou claro que insistir na mesma plataforma nao seria a melhor decisao. Investir em outro Arduino Leonardo apenas para tentar contornar essas barreiras deixou de fazer sentido. Diante disso, optei por encerrar o projeto nessa base e buscar uma alternativa mais adequada — uma plataforma que lide de forma nativa e mais robusta com os reports de FFB, permitindo uma evolução mais consistente e alinhada com os objetivos iniciais. O código ficará aberto para estudo e para aventureiros que queiram se desafiar e provar que esse limite também podem ser superado, mas infelizmente aqui eu ergo minha bandeira branca por inabilidade e falta de experiência, pois esse foi o meu primeiro projeto embarcado e acho que aprendi muito com ele.
+
+The BRSWDIY project came to an end after a series of obstacles that, combined, made its continuation unfeasible. From the beginning, I faced problems related to the expandable memory in the disk partition where the games were installed due to an extremely fragile PID created by me, which generated inconsistencies and hindered the stable operation of the system. Even after several attempts to overcome these limitations, the lack of experience and more in-depth knowledge ended up aggravating the situation.
+
+During this process, an attempt at adjustment ended up compromising the operation of the Arduino Leonardo, which began to exhibit a failure in the USB port, making any form of communication or direct reprogramming impossible. Without another Arduino available to perform a possible reflash or recovery via ISP, the device became unusable.
+
+At the same time, upon better understanding the limitations of the architecture used and the difficulties inherent in supporting force feedback in this context, it became clear that insisting on the same platform would not be the best decision. Investing in another Arduino Leonardo just to try to overcome these barriers no longer made sense. Given this, I opted to end the project on this basis and seek a more suitable alternative — a platform that natively and more robustly handles FFB reports, allowing for more consistent evolution aligned with the initial objectives. The code will remain open for study and for adventurers who want to challenge themselves and prove that this limit can also be overcome, but unfortunately, here I raise my white flag due to inability and lack of experience, as this was my first embedded project and I believe I learned a lot from it.
+
 ## PT-BR
 
 ### Visao geral
@@ -134,14 +148,6 @@ Este projeto existe gracas ao trabalho de base de:
 - ranenbg - [Arduino-FFB-wheel](https://github.com/ranenbg/Arduino-FFB-wheel)
 
 Muito obrigado por tornarem esse tipo de projeto possivel.
-
-### Me ajude a montar meu primeiro DD Diy.
-
-Estou tentando fazer meu primeiro projeto usando motor hoverboard.
-
-Pix: ranierfernandodias@gmail.com
-
-Prometo retirar secao assim que alcançar a meta - R$ 1.500,00
 
 ## EN
 
