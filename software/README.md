@@ -201,3 +201,116 @@ poetry run pytest
 - The app uses `customtkinter` and `pyserial`.
 - The Nuitka build automatically bundles the app icon from `assets/icon/`.
 - If the device does not auto-connect, verify the serial port and flashed firmware.
+
+## Linux (Ubuntu/Debian)
+
+### Requirements
+
+- Python 3.11 or newer
+- `python3-tk`
+- `pip` or `poetry`
+- `patchelf`
+- `gcc`, `g++`, `make`
+- Compatible firmware flashed to the device
+
+Suggested packages:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv python3-tk build-essential patchelf
+```
+
+Optional serial access fix:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+Then log out and back in.
+
+### Run in development
+
+With `poetry`:
+
+```bash
+poetry install --with dev
+poetry run apus
+```
+
+Or directly with Python:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+python3 -m brswdiy_app.main
+```
+
+### Build with Nuitka on Linux
+
+Python script:
+
+```bash
+python3 ./build_nuitka_linux.py
+```
+
+Shell shortcut:
+
+```bash
+bash ./build_nuitka_linux.sh
+```
+
+The Linux build outputs:
+
+- staged app directory in `dist/linux/`
+- intermediate files in `build/nuitka-linux/`
+- report in `build/nuitka-linux/nuitka-report.xml`
+
+Run the packaged app with:
+
+```bash
+./dist/linux/apus
+```
+
+A basic desktop entry template is available at:
+
+- `packaging/linux/apus.desktop`
+
+### Build Debian package (.deb)
+
+Python script:
+
+```bash
+python3 ./build_deb_linux.py
+```
+
+Shell shortcut:
+
+```bash
+bash ./build_deb_linux.sh
+```
+
+The Debian package output is generated at:
+
+- `dist/apus_<version>_<arch>.deb`
+
+Install with:
+
+```bash
+sudo dpkg -i ./dist/apus_<version>_<arch>.deb
+```
+
+If Ubuntu/Debian reports missing dependencies:
+
+```bash
+sudo apt -f install
+```
+
+The Debian package installs:
+
+- the app bundle in `/opt/apus`
+- a launcher symlink at `/usr/bin/apus`
+- a desktop entry in `/usr/share/applications/apus.desktop`
+- the app icon in `/usr/share/icons/hicolor/256x256/apps/apus-icon.png`
+
+It also refreshes desktop and icon caches on install/remove when the host system provides the standard tools.
