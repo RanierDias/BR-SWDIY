@@ -4,7 +4,7 @@
 
 namespace
 {
-    constexpr uint8_t MAX_EFFECT_SLOTS = 8;
+    constexpr uint8_t MAX_EFFECT_SLOTS = 11;
 #ifndef FFB_DIRECTION_ENABLED
 #define FFB_DIRECTION_ENABLED 0
 #endif

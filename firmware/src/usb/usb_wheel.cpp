@@ -15,7 +15,6 @@ namespace
     constexpr uint8_t HID_REPORT_TYPE_FEATURE = 0x03;
 
     constexpr uint8_t JOYSTICK_REPORT_ID = 0x04;
-    constexpr uint8_t PID_STATE_REPORT_ID = 0x02;
 
     constexpr uint8_t PID_SET_EFFECT_REPORT_ID = 0x01;
     constexpr uint8_t PID_SET_ENVELOPE_REPORT_ID = 0x02;
@@ -197,16 +196,9 @@ namespace
         bool valid = false;
     };
 
-    struct PidStatusPayload
-    {
-        uint8_t status = 0;
-        uint8_t effect_block_index = 0;
-    };
-
     WheelInputState g_input_state;
     SentInputSnapshot g_last_input_snapshot;
-    PidStatusPayload g_last_status_payload;
-    BlockLoadFeatureReport g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
+    BlockLoadFeatureReport g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0xFFFF};
     UsbFfbRuntimeStatus g_runtime_status;
     uint32_t g_last_input_report_ms = 0;
     bool g_usb_session_active = false;
@@ -287,6 +279,19 @@ namespace
         return static_cast<uint16_t>(constrain(static_cast<int32_t>(scaled), 0L, 65535L));
     }
 
+    void discard_control_payload(uint16_t len)
+    {
+        uint8_t buffer[16];
+        while (len > 0)
+        {
+            const uint8_t chunk = (len < sizeof(buffer))
+                                      ? static_cast<uint8_t>(len)
+                                      : static_cast<uint8_t>(sizeof(buffer));
+            USB_RecvControl(buffer, chunk);
+            len = static_cast<uint16_t>(len - chunk);
+        }
+    }
+
     bool is_valid_effect_id(uint8_t effect_id)
     {
         return effect_id > 0 && effect_id <= ffb_get_max_effect_slots();
@@ -303,21 +308,6 @@ namespace
         }
 
         return 0;
-    }
-
-    uint16_t compute_ram_pool_available()
-    {
-        const uint8_t total = ffb_get_max_effect_slots();
-        const uint8_t used_slots = ffb_get_allocated_effect_count();
-        const uint8_t free_slots = (used_slots >= total) ? 0 : static_cast<uint8_t>(total - used_slots);
-        const uint16_t bytes_per_effect = static_cast<uint16_t>(sizeof(FfbEffectSlot));
-
-        return static_cast<uint16_t>(free_slots * bytes_per_effect);
-    }
-
-    uint16_t compute_ram_pool_size()
-    {
-        return static_cast<uint16_t>(ffb_get_max_effect_slots() * sizeof(FfbEffectSlot));
     }
 
     FfbEffectType decode_effect_type(uint8_t raw_type)
@@ -358,49 +348,6 @@ namespace
         }
     }
 
-    uint8_t current_effect_id_with_activity()
-    {
-        for (uint8_t effect_id = 1; effect_id <= ffb_get_max_effect_slots(); ++effect_id)
-        {
-            FfbEffectSlot slot;
-            if (ffb_get_effect_slot(effect_id, slot) && slot.allocated && slot.enabled)
-            {
-                return effect_id;
-            }
-        }
-
-        return 0;
-    }
-
-    PidStatusPayload build_status_payload()
-    {
-        PidStatusPayload payload;
-        const FfbDeviceState &state = ffb_get_device_state();
-
-        if (!state.ffb_enabled)
-        {
-            payload.status |= PID_STATUS_DEVICE_PAUSED;
-        }
-        else
-        {
-            payload.status |= PID_STATUS_ACTUATORS_ENABLED;
-        }
-
-        if (state.host_connected)
-        {
-            payload.status |= PID_STATUS_ACTUATOR_POWER;
-            payload.status |= PID_STATUS_SAFETY_SWITCH;
-        }
-
-        const uint8_t effect_id = current_effect_id_with_activity();
-        if (effect_id != 0)
-        {
-            payload.effect_block_index = static_cast<uint8_t>(PID_STATUS_EFFECT_PLAYING | effect_id);
-        }
-
-        return payload;
-    }
-
     bool same_snapshot(const SentInputSnapshot &lhs, const SentInputSnapshot &rhs)
     {
         return lhs.valid == rhs.valid &&
@@ -429,23 +376,8 @@ namespace
     {
         g_usb_session_active = false;
         g_last_input_snapshot = SentInputSnapshot{};
-        g_last_status_payload = PidStatusPayload{};
         g_last_input_report_ms = 0;
-        g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
-    }
-
-    void send_pid_status_if_needed(bool force)
-    {
-        const PidStatusPayload payload = build_status_payload();
-        if (!force &&
-            payload.status == g_last_status_payload.status &&
-            payload.effect_block_index == g_last_status_payload.effect_block_index)
-        {
-            return;
-        }
-
-        HID_SendReport(PID_STATE_REPORT_ID, &payload, sizeof(payload));
-        g_last_status_payload = payload;
+        g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0xFFFF};
     }
 
     void send_input_report_if_needed(uint32_t now_ms)
@@ -472,7 +404,7 @@ namespace
         g_last_block_load_report.report_id = PID_BLOCK_LOAD_REPORT_ID;
         g_last_block_load_report.effect_block_index = effect_id;
         g_last_block_load_report.load_status = load_status;
-        g_last_block_load_report.ram_pool_available = compute_ram_pool_available();
+        g_last_block_load_report.ram_pool_available = 0xFFFF;
     }
 
     void stop_other_effects(uint8_t keep_effect_id)
@@ -824,7 +756,7 @@ namespace
         {
             const PoolFeatureReport report = {
                 PID_POOL_REPORT_ID,
-                compute_ram_pool_size(),
+                0xFFFF,
                 ffb_get_max_effect_slots(),
                 0x03};
             send_feature_report(&report, sizeof(report));
@@ -872,6 +804,24 @@ namespace
         return true;
     }
 
+    bool handle_output_set_report_via_control(uint8_t report_id, uint16_t report_length)
+    {
+        if (report_length == 0 || report_length > 63)
+        {
+            discard_control_payload(report_length);
+            return false;
+        }
+
+        uint8_t report_buffer[64] = {};
+        USB_RecvControl(report_buffer, report_length);
+        if (report_buffer[0] == 0 && report_id != 0)
+        {
+            report_buffer[0] = report_id;
+        }
+        handle_output_report(report_buffer, report_length);
+        return true;
+    }
+
     bool usb_hid_setup(Setup &setup)
     {
         const uint8_t request = setup.bRequest;
@@ -901,8 +851,19 @@ namespace
             case HID_SET_REPORT:
                 if (report_type == HID_REPORT_TYPE_FEATURE)
                 {
-                    return handle_feature_set_report(report_id);
+                    if (handle_feature_set_report(report_id))
+                    {
+                        return true;
+                    }
+
+                    discard_control_payload(setup.wLength);
+                    return true;
                 }
+                if (report_type == HID_REPORT_TYPE_OUTPUT)
+                {
+                    return handle_output_set_report_via_control(report_id, setup.wLength);
+                }
+                discard_control_payload(setup.wLength);
                 return true;
             default:
                 break;
@@ -922,8 +883,7 @@ void setup_usb_wheel()
 {
     g_input_state = WheelInputState{};
     g_last_input_snapshot = SentInputSnapshot{};
-    g_last_status_payload = PidStatusPayload{};
-    g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0};
+    g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0xFFFF};
     g_runtime_status = UsbFfbRuntimeStatus{};
 
     USBDevice.HID_Setup_Callback = usb_hid_setup;
@@ -949,11 +909,9 @@ void update_usb_wheel()
     {
         g_usb_session_active = true;
         ffb_set_host_connection(true, now_ms);
-        send_pid_status_if_needed(true);
     }
 
     send_input_report_if_needed(now_ms);
-    send_pid_status_if_needed(false);
 }
 
 bool usb_wheel_ready()
