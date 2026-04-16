@@ -23,6 +23,7 @@ static DeviceConfig g_config;
 static DeviceStatus g_status;
 static InputCalibration g_input_calibration;
 static int16_t g_encoder_zero_offset = 0;
+static uint32_t g_last_fast_update = 0;
 static uint32_t g_last_slow_update = 0;
 static uint16_t g_max_angle_counts = 0;
 static WheelInputState g_input_state;
@@ -252,14 +253,18 @@ void update_app()
 {
   const uint32_t now = micros();
 
-  update_encoder();
-  update_pedals();
-  update_buttons();
-  refresh_control_state(now);
-  update_motor_output();
-  update_usb_wheel();
+  if ((now - g_last_fast_update) >= brswdiy::protocol::CONTROL_PERIOD_US)
+  {
+    g_last_fast_update = now;
+    update_encoder();
+    update_pedals();
+    update_buttons();
+    refresh_control_state(now);
+    update_motor_output();
+    update_usb_wheel();
+  }
 
-  if ((now - g_last_slow_update) >= 5000)
+  if ((now - g_last_slow_update) >= brswdiy::protocol::SERIAL_PERIOD_US)
   {
     g_last_slow_update = now;
     process_serial_protocol();
