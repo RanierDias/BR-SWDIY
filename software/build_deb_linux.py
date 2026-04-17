@@ -1,121 +1,142 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import os
+import platform
 import shutil
-import stat
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 
-def load_version(pyproject_path: Path) -> str:
-    with pyproject_path.open('rb') as f:
-        data = tomllib.load(f)
-    return data['project']['version']
+APP_ID = 'apus'
+PACKAGE_NAME = 'apus'
+DESCRIPTION = 'BR-SWDIY wheel configuration utility'
+MAINTAINER = 'Lótus Azul <lotusazul@users.noreply.github.com>'
+SECTION = 'utils'
+PRIORITY = 'optional'
+HOMEPAGE = 'https://github.com/AdamsGt/BR-SWDIY'
+INSTALLED_SIZE_PADDING_KB = 1024
 
 
-def detect_arch() -> str:
-    try:
-        result = subprocess.run(
-            ['dpkg', '--print-architecture'],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        arch = result.stdout.strip()
-        if arch:
-            return arch
-    except Exception:
-        pass
-
-    machine = os.uname().machine.lower()
-    mapping = {
-        'x86_64': 'amd64',
-        'amd64': 'amd64',
-        'aarch64': 'arm64',
-        'arm64': 'arm64',
-        'armv7l': 'armhf',
-    }
-    return mapping.get(machine, machine)
+def read_version(pyproject_path: Path) -> str:
+    for line in pyproject_path.read_text(encoding='utf-8').splitlines():
+        stripped = line.strip()
+        if stripped.startswith('version ='):
+            return stripped.split('=', 1)[1].strip().strip('"')
+    raise RuntimeError('Could not find project version in pyproject.toml')
 
 
-def copy_tree(src: Path, dst: Path) -> None:
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+def map_arch(machine: str) -> str:
+    machine = machine.lower()
+    if machine in {'x86_64', 'amd64'}:
+        return 'amd64'
+    if machine in {'aarch64', 'arm64'}:
+        return 'arm64'
+    if machine.startswith('armv7'):
+        return 'armhf'
+    return machine
 
 
-def write_executable(path: Path, content: str) -> None:
+def write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding='utf-8', newline='\n')
-    mode = path.stat().st_mode
-    path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def compute_installed_size_kb(path: Path) -> int:
+    total = 0
+    for child in path.rglob('*'):
+        if child.is_file():
+            total += child.stat().st_size
+    return max(1, (total + 1023) // 1024 + INSTALLED_SIZE_PADDING_KB)
+
+
+def copy_script_if_exists(src: Path, dst: Path) -> None:
+    if src.exists():
+        shutil.copy2(src, dst)
+        dst.chmod(0o755)
 
 
 def main() -> int:
+    if sys.platform != 'linux':
+        print('This build script is intended for Linux (Ubuntu/Debian).', file=sys.stderr)
+        return 1
+
     project_root = Path(__file__).resolve().parent
-    version = load_version(project_root / 'pyproject.toml')
-    arch = detect_arch()
+    output_dir = project_root / 'dist'
+    linux_build_dir = output_dir / 'linux'
+    pyproject_path = project_root / 'pyproject.toml'
+    packaging_dir = project_root / 'packaging' / 'linux'
+    desktop_template = packaging_dir / 'apus.desktop'
+    icon_png = project_root / 'assets' / 'icon' / 'apus-icon.png'
 
-    subprocess.run([sys.executable, str(project_root / 'build_nuitka_linux.py')], check=True)
+    version = read_version(pyproject_path)
+    arch = map_arch(platform.machine())
 
-    dist_root = project_root / 'dist'
-    linux_dist = dist_root / 'linux'
-    app_dist = linux_dist / 'apus.dist'
-    if not app_dist.exists():
-        raise FileNotFoundError(f'Nuitka standalone output not found: {app_dist}')
+    build_result = subprocess.call([sys.executable, str(project_root / 'build_nuitka_linux.py')], cwd=project_root)
+    if build_result != 0:
+        return build_result
 
-    build_root = project_root / 'build' / 'deb'
-    pkg_root = build_root / 'apus'
-    debian_dir = pkg_root / 'DEBIAN'
-    opt_dir = pkg_root / 'opt' / 'apus'
-    bin_dir = pkg_root / 'usr' / 'bin'
-    app_dir = pkg_root / 'usr' / 'share' / 'applications'
-    icon_dir = pkg_root / 'usr' / 'share' / 'icons' / 'hicolor' / '256x256' / 'apps'
-    doc_dir = pkg_root / 'usr' / 'share' / 'doc' / 'apus'
+    if not linux_build_dir.exists():
+        print('Linux standalone build not found at dist/linux', file=sys.stderr)
+        return 1
 
-    if pkg_root.exists():
-        shutil.rmtree(pkg_root)
+    deb_root = project_root / 'build' / 'deb' / f'{PACKAGE_NAME}_{version}_{arch}'
+    if deb_root.exists():
+        shutil.rmtree(deb_root)
 
-    for path in [debian_dir, opt_dir.parent, bin_dir, app_dir, icon_dir, doc_dir]:
-        path.mkdir(parents=True, exist_ok=True)
+    opt_dir = deb_root / 'opt' / APP_ID
+    bin_dir = deb_root / 'usr' / 'bin'
+    app_dir = deb_root / 'usr' / 'share' / 'applications'
+    icon_dir = deb_root / 'usr' / 'share' / 'icons' / 'hicolor' / '256x256' / 'apps'
+    doc_dir = deb_root / 'usr' / 'share' / 'doc' / PACKAGE_NAME
+    debian_dir = deb_root / 'DEBIAN'
 
-    copy_tree(app_dist, opt_dir)
+    shutil.copytree(linux_build_dir, opt_dir)
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    app_dir.mkdir(parents=True, exist_ok=True)
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    doc_dir.mkdir(parents=True, exist_ok=True)
+    debian_dir.mkdir(parents=True, exist_ok=True)
 
-    launcher = "#!/usr/bin/env sh\nexec /opt/apus/apus \"$@\"\n"
-    write_executable(bin_dir / 'apus', launcher)
+    launcher_path = bin_dir / APP_ID
+    launcher_path.symlink_to(Path('/opt') / APP_ID / APP_ID)
 
-    shutil.copy2(project_root / 'packaging' / 'linux' / 'apus.desktop', app_dir / 'apus.desktop')
-    shutil.copy2(project_root / 'assets' / 'icon' / 'apus-icon.png', icon_dir / 'apus-icon.png')
-    shutil.copy2(project_root / 'README.md', doc_dir / 'README.md')
+    desktop_content = desktop_template.read_text(encoding='utf-8')
+    write_text(app_dir / 'apus.desktop', desktop_content)
+    shutil.copy2(icon_png, icon_dir / 'apus-icon.png')
 
-    control = f"""Package: apus
+    readme_src = project_root / 'README.md'
+    if readme_src.exists():
+        shutil.copy2(readme_src, doc_dir / 'README.md')
+
+    installed_size = compute_installed_size_kb(deb_root)
+
+    control = f'''Package: {PACKAGE_NAME}
 Version: {version}
-Section: utils
-Priority: optional
+Section: {SECTION}
+Priority: {PRIORITY}
 Architecture: {arch}
-Maintainer: AdamsGt <adamsgt@users.noreply.github.com>
+Maintainer: {MAINTAINER}
+Homepage: {HOMEPAGE}
 Depends: python3, python3-tk
-Installed-Size: 20480
-Homepage: https://github.com/AdamsGt/BR-SWDIY
-Description: Apus Utility for BRSWDIY wheels
+Installed-Size: {installed_size}
+Description: {DESCRIPTION}
  Desktop utility for configuring and monitoring the BRSWDIY / Apus wheel.
-"""
-    (debian_dir / 'control').write_text(control, encoding='utf-8', newline='\n')
+ It provides serial-based setup, calibration and live monitoring for the
+ BR-SWDIY wheel firmware on Linux desktop environments.
+'''
+    write_text(debian_dir / 'control', control)
 
-    for script_name in ['postinst', 'prerm', 'postrm']:
-        src = project_root / 'packaging' / 'linux' / script_name
-        dst = debian_dir / script_name
-        shutil.copy2(src, dst)
-        mode = dst.stat().st_mode
-        dst.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    copy_script_if_exists(packaging_dir / 'postinst', debian_dir / 'postinst')
+    copy_script_if_exists(packaging_dir / 'prerm', debian_dir / 'prerm')
+    copy_script_if_exists(packaging_dir / 'postrm', debian_dir / 'postrm')
 
-    output_deb = dist_root / f'apus_{version}_{arch}.deb'
-    if output_deb.exists():
-        output_deb.unlink()
+    deb_output = output_dir / f'{PACKAGE_NAME}_{version}_{arch}.deb'
+    if deb_output.exists():
+        deb_output.unlink()
 
-    subprocess.run(['dpkg-deb', '--build', str(pkg_root), str(output_deb)], check=True)
-    print(output_deb)
+    subprocess.run(['dpkg-deb', '--build', str(deb_root), str(deb_output)], check=True)
+
+    print('Debian package ready at:', deb_output)
     return 0
 
 

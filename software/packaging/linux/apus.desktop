@@ -1,12 +1,13 @@
-﻿[Desktop Entry]
-Version=1.0
+[Desktop Entry]
 Type=Application
-Name=Apus Utility
-GenericName=Wheel Configuration Tool
-Comment=Configure and monitor the BRSWDIY / Apus wheel
-Exec=apus
+Version=1.0
+Name=Apus
+GenericName=Wheel Configurator
+Comment=Configure and monitor the BR-SWDIY / Apus wheel
+Exec=/usr/bin/apus
 Icon=apus-icon
 Terminal=false
-Categories=Utility;System;Settings;
-Keywords=wheel;ffb;force feedback;simracing;serial;
+Categories=Utility;Settings;System;
+Keywords=wheel;ffb;simracing;joystick;serial;configuration;
 StartupNotify=true
+StartupWMClass=Apus

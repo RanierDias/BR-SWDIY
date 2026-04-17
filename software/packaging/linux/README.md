@@ -1,75 +1,27 @@
-﻿# Linux Packaging
+# Linux Packaging
 
-## PT-BR
+This folder contains Linux packaging helpers for the BR-SWDIY GUI.
 
-Arquivos de empacotamento Linux para a GUI `Apus`.
+Files:
 
-### O que existe aqui
+- `apus.desktop`: desktop launcher template for Ubuntu/Debian desktop environments
+- `postinst`: refreshes desktop and icon caches after install
+- `prerm`: package removal hook placeholder
+- `postrm`: refreshes desktop and icon caches after removal
 
-- `apus.desktop` - atalho de menu/aplicativo
-- `postinst` - atualiza caches de desktop e icones apos instalar
-- `prerm` - hook simples de remocao
-- `postrm` - atualiza caches apos remover
+Build outputs:
 
-### Fluxo de build
+- standalone app staged in `dist/linux/`
+- Debian package in `dist/apus_<version>_<arch>.deb`
 
-1. Gere a build standalone do Nuitka:
-
-```bash
-python3 ./build_nuitka_linux.py
-```
-
-2. Gere o pacote `.deb`:
+Suggested install command:
 
 ```bash
-python3 ./build_deb_linux.py
+sudo dpkg -i ./dist/apus_<version>_<arch>.deb
 ```
 
-Ou use os atalhos shell:
+If dependencies are missing:
 
 ```bash
-bash ./build_nuitka_linux.sh
-bash ./build_deb_linux.sh
+sudo apt -f install
 ```
-
-### Saidas esperadas
-
-- `dist/linux/apus.dist/` - build standalone do app
-- `dist/apus_<version>_<arch>.deb` - pacote Debian
-
-## EN
-
-Linux packaging files for the `Apus` GUI.
-
-### Contents
-
-- `apus.desktop` - application launcher entry
-- `postinst` - refreshes desktop/icon caches after install
-- `prerm` - simple removal hook
-- `postrm` - refreshes caches after uninstall
-
-### Build flow
-
-1. Generate the Nuitka standalone build:
-
-```bash
-python3 ./build_nuitka_linux.py
-```
-
-2. Generate the `.deb` package:
-
-```bash
-python3 ./build_deb_linux.py
-```
-
-Or use the shell shortcuts:
-
-```bash
-bash ./build_nuitka_linux.sh
-bash ./build_deb_linux.sh
-```
-
-### Expected outputs
-
-- `dist/linux/apus.dist/` - standalone app build
-- `dist/apus_<version>_<arch>.deb` - Debian package
