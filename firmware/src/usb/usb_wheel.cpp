@@ -199,7 +199,6 @@ namespace
     WheelInputState g_input_state;
     SentInputSnapshot g_last_input_snapshot;
     BlockLoadFeatureReport g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0xFFFF};
-    UsbFfbRuntimeStatus g_runtime_status;
     uint32_t g_last_input_report_ms = 0;
     bool g_usb_session_active = false;
 
@@ -624,8 +623,6 @@ namespace
         }
 
         const uint8_t report_id = data[0];
-        ++g_runtime_status.output_report_count;
-        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         switch (report_id)
@@ -742,8 +739,6 @@ namespace
 
     bool handle_feature_get_report(uint8_t report_id)
     {
-        ++g_runtime_status.feature_report_count;
-        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         if (report_id == PID_BLOCK_LOAD_REPORT_ID)
@@ -768,8 +763,6 @@ namespace
 
     bool handle_feature_set_report(uint8_t report_id)
     {
-        ++g_runtime_status.feature_report_count;
-        g_runtime_status.last_report_id = report_id;
         ffb_note_host_activity(millis());
 
         if (report_id != PID_CREATE_NEW_EFFECT_REPORT_ID)
@@ -884,7 +877,6 @@ void setup_usb_wheel()
     g_input_state = WheelInputState{};
     g_last_input_snapshot = SentInputSnapshot{};
     g_last_block_load_report = {PID_BLOCK_LOAD_REPORT_ID, 0, BLOCK_LOAD_FULL, 0xFFFF};
-    g_runtime_status = UsbFfbRuntimeStatus{};
 
     USBDevice.HID_Setup_Callback = usb_hid_setup;
     USBDevice.HID_ReceiveReport_Callback = usb_hid_receive_report;
@@ -924,11 +916,6 @@ void usb_wheel_set_input_state(const WheelInputState &state)
     g_input_state = state;
 }
 
-const UsbFfbRuntimeStatus &usb_wheel_get_runtime_status()
-{
-    return g_runtime_status;
-}
-
 #else
 
 void setup_usb_wheel()
@@ -946,12 +933,6 @@ bool usb_wheel_ready()
 
 void usb_wheel_set_input_state(const WheelInputState &)
 {
-}
-
-const UsbFfbRuntimeStatus &usb_wheel_get_runtime_status()
-{
-    static UsbFfbRuntimeStatus status;
-    return status;
 }
 
 #endif
