@@ -1,0 +1,12 @@
+﻿[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Apus Utility
+GenericName=Wheel Configuration Tool
+Comment=Configure and monitor the BRSWDIY / Apus wheel
+Exec=apus
+Icon=apus-icon
+Terminal=false
+Categories=Utility;System;Settings;
+Keywords=wheel;ffb;force feedback;simracing;serial;
+StartupNotify=true

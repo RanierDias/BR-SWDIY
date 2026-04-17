@@ -1,4 +1,4 @@
-# Apus Utility
+﻿# Apus Utility
 
 Aplicativo desktop para configurar e monitorar o volante BRSWDIY / Apus.
 
@@ -9,16 +9,21 @@ Desktop utility for configuring and monitoring the BRSWDIY / Apus wheel.
 ### Requisitos
 
 - Python 3.11 ou superior
-- Windows
 - `pip` ou `poetry`
-- Firmware compatível gravado no dispositivo
+- Firmware compativel gravado no dispositivo
+- No Linux: `python3-tk`, `build-essential` e `patchelf` para builds com Nuitka
 
 ### Estrutura do projeto
 
 - `src/brswdiy_app/` - codigo-fonte do aplicativo
 - `assets/` - icones e recursos visuais
-- `build_nuitka.py` - script de build do executavel
-- `build_nuitka.ps1` - atalho PowerShell para build
+- `build_nuitka.py` - build Windows com Nuitka
+- `build_nuitka.ps1` - atalho PowerShell para build Windows
+- `build_nuitka_linux.py` - build Linux standalone com Nuitka
+- `build_nuitka_linux.sh` - atalho shell para build Linux standalone
+- `build_deb_linux.py` - gera pacote `.deb`
+- `build_deb_linux.sh` - atalho shell para gerar `.deb`
+- `packaging/linux/` - arquivos de empacotamento Linux
 
 ### Instalar dependencias
 
@@ -35,6 +40,13 @@ Com `poetry`:
 
 ```powershell
 poetry install --with dev
+```
+
+No Ubuntu/Debian, instale tambem:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv python3-tk build-essential patchelf
 ```
 
 ### Rodar em desenvolvimento
@@ -57,7 +69,7 @@ Se estiver usando apenas `venv`:
 python -m src.brswdiy_app.main
 ```
 
-### Build com Nuitka
+### Build Windows com Nuitka
 
 Script Python:
 
@@ -71,11 +83,49 @@ Atalho PowerShell:
 .\build_nuitka.ps1
 ```
 
-O build gera:
+### Build Linux standalone com Nuitka
 
-- executavel em `dist/`
-- arquivos intermediarios em `build/nuitka/`
-- relatorio em `build/nuitka/nuitka-report.xml`
+No Linux:
+
+```bash
+python3 ./build_nuitka_linux.py
+```
+
+Ou:
+
+```bash
+bash ./build_nuitka_linux.sh
+```
+
+Saida esperada:
+
+- `dist/linux/apus.dist/`
+- relatorio em `build/nuitka-linux/nuitka-report.xml`
+
+### Gerar pacote Debian `.deb`
+
+No Linux:
+
+```bash
+python3 ./build_deb_linux.py
+```
+
+Ou:
+
+```bash
+bash ./build_deb_linux.sh
+```
+
+Saida esperada:
+
+- `dist/apus_<version>_<arch>.deb`
+
+Instalacao:
+
+```bash
+sudo dpkg -i ./dist/apus_<version>_<arch>.deb
+sudo apt -f install
+```
 
 ### Comandos uteis
 
@@ -97,27 +147,33 @@ Testes:
 poetry run pytest
 ```
 
-### Observações
+### Observacoes
 
 - O app usa `customtkinter` e `pyserial`.
-- O build do Nuitka inclui o icone do app automaticamente a partir de `assets/icon/`.
-- Se o dispositivo não conectar automaticamente, confira a porta serial e o firmware gravado.
+- O build do Nuitka inclui os assets do icone do app.
+- A trilha Linux foi preparada no repositório, mas a validacao final do build ainda precisa ser feita no Ubuntu/Debian.
+- Se o dispositivo nao conectar automaticamente, confira a porta serial e o firmware gravado.
 
 ## EN
 
 ### Requirements
 
 - Python 3.11 or newer
-- Windows
 - `pip` or `poetry`
 - Compatible firmware flashed to the device
+- On Linux: `python3-tk`, `build-essential`, and `patchelf` for Nuitka builds
 
 ### Project structure
 
 - `src/brswdiy_app/` - application source code
 - `assets/` - icons and visual assets
-- `build_nuitka.py` - executable build script
-- `build_nuitka.ps1` - PowerShell shortcut for builds
+- `build_nuitka.py` - Windows Nuitka build script
+- `build_nuitka.ps1` - PowerShell shortcut for Windows builds
+- `build_nuitka_linux.py` - Linux standalone Nuitka build script
+- `build_nuitka_linux.sh` - shell shortcut for Linux standalone builds
+- `build_deb_linux.py` - Debian package generator
+- `build_deb_linux.sh` - shell shortcut for `.deb` packaging
+- `packaging/linux/` - Linux packaging files
 
 ### Install dependencies
 
@@ -134,6 +190,13 @@ With `poetry`:
 
 ```powershell
 poetry install --with dev
+```
+
+On Ubuntu/Debian, also install:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv python3-tk build-essential patchelf
 ```
 
 ### Run in development
@@ -156,7 +219,7 @@ If you are using a plain `venv`:
 python -m src.brswdiy_app.main
 ```
 
-### Build with Nuitka
+### Build Windows with Nuitka
 
 Python script:
 
@@ -170,11 +233,49 @@ PowerShell shortcut:
 .\build_nuitka.ps1
 ```
 
-The build outputs:
+### Build Linux standalone with Nuitka
 
-- executable in `dist/`
-- intermediate files in `build/nuitka/`
-- report in `build/nuitka/nuitka-report.xml`
+On Linux:
+
+```bash
+python3 ./build_nuitka_linux.py
+```
+
+Or:
+
+```bash
+bash ./build_nuitka_linux.sh
+```
+
+Expected output:
+
+- `dist/linux/apus.dist/`
+- report in `build/nuitka-linux/nuitka-report.xml`
+
+### Build Debian `.deb` package
+
+On Linux:
+
+```bash
+python3 ./build_deb_linux.py
+```
+
+Or:
+
+```bash
+bash ./build_deb_linux.sh
+```
+
+Expected output:
+
+- `dist/apus_<version>_<arch>.deb`
+
+Install with:
+
+```bash
+sudo dpkg -i ./dist/apus_<version>_<arch>.deb
+sudo apt -f install
+```
 
 ### Useful commands
 
@@ -199,5 +300,6 @@ poetry run pytest
 ### Notes
 
 - The app uses `customtkinter` and `pyserial`.
-- The Nuitka build automatically bundles the app icon from `assets/icon/`.
+- The Nuitka build includes the app icon assets.
+- The Linux packaging path has been restored in the repository, but final validation still needs to happen on Ubuntu/Debian.
 - If the device does not auto-connect, verify the serial port and flashed firmware.
