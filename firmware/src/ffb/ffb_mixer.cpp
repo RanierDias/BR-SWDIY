@@ -2,22 +2,49 @@
 
 #include <Arduino.h>
 
+#include "app/app.h"
 #include "ffb/ffb_effects.h"
 
 namespace
 {
-    constexpr int8_t OUTPUT_SLEW_STEP = 18;
-    constexpr int8_t OUTPUT_CROSSOVER_STEP = 28;
-    constexpr int8_t MIN_ACTIVE_FORCE = 6;
+    constexpr int8_t OUTPUT_SLEW_STEP = 16;
+    constexpr int8_t OUTPUT_CROSSOVER_STEP = 26;
+    constexpr int8_t MIN_ACTIVE_FORCE = 8;
     constexpr int8_t CENTER_DAMPING_FORCE = 4;
-    constexpr int8_t CENTER_BLEND_WINDOW = 12;
-    constexpr int16_t CENTER_ANGLE_WINDOW = 120;
+    constexpr int8_t CENTER_BLEND_WINDOW = 16;
+    constexpr int16_t CENTER_ANGLE_WINDOW = 160;
     constexpr int16_t CENTER_VELOCITY_THRESHOLD = 2;
     int8_t g_last_output_percent = 0;
 
+    int16_t compute_spring_centering(const WheelInputState &input, const DeviceConfig &config)
+    {
+        if (config.spring == 0)
+        {
+            return 0;
+        }
+
+        const int16_t abs_angle = abs(input.angle);
+        if (abs_angle <= CENTER_VELOCITY_THRESHOLD)
+        {
+            return 0;
+        }
+
+        const uint16_t half_angle_counts = (get_half_angle_counts() == 0) ? 1 : get_half_angle_counts();
+        const int16_t normalized = static_cast<int16_t>(
+            constrain((static_cast<int32_t>(abs_angle) * 100L) / half_angle_counts, 0L, 100L));
+
+        // Quick center engagement with a gentle saturation toward the ends.
+        const int16_t curve = static_cast<int16_t>(
+            normalized + ((static_cast<int32_t>(normalized) * (100 - normalized)) / 100L));
+        const int16_t magnitude = static_cast<int16_t>(
+            (static_cast<int32_t>(config.spring) * curve) / 100L);
+
+        return (input.angle > 0) ? magnitude : -magnitude;
+    }
+
     int16_t compute_baseline_support(const WheelInputState &input, const DeviceConfig &config)
     {
-        int16_t support_force = 0;
+        int16_t support_force = compute_spring_centering(input, config);
 
         if (config.damper > 0)
         {
@@ -43,7 +70,7 @@ namespace
             }
         }
 
-        return constrain(support_force, -12, 12);
+        return constrain(support_force, -18, 18);
     }
 
     int8_t apply_slew_limit(int8_t target_output)
@@ -88,8 +115,17 @@ namespace
 
         const int8_t sign = (output_percent > 0) ? 1 : -1;
         int8_t magnitude = abs(output_percent);
-        magnitude = static_cast<int8_t>(
-            MIN_ACTIVE_FORCE + ((static_cast<int16_t>(magnitude) * (100 - MIN_ACTIVE_FORCE)) / 100));
+        if (magnitude <= 20)
+        {
+            magnitude = static_cast<int8_t>(
+                MIN_ACTIVE_FORCE + ((static_cast<int16_t>(magnitude) * (24 - MIN_ACTIVE_FORCE)) / 20));
+        }
+        else
+        {
+            magnitude = static_cast<int8_t>(
+                24 + ((static_cast<int16_t>(magnitude - 20) * (100 - 24)) / 80));
+        }
+
         if (magnitude < MIN_ACTIVE_FORCE)
         {
             magnitude = MIN_ACTIVE_FORCE;
@@ -102,6 +138,14 @@ namespace
     {
         if (output_percent != 0)
         {
+            if (abs(input.angle) <= CENTER_ANGLE_WINDOW && abs(output_percent) <= CENTER_BLEND_WINDOW)
+            {
+                const int8_t sign = (output_percent > 0) ? 1 : -1;
+                const int8_t warmed = static_cast<int8_t>(
+                    constrain(abs(output_percent) + 2, 0, 100));
+                return static_cast<int8_t>(sign * warmed);
+            }
+
             return output_percent;
         }
 

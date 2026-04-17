@@ -3,8 +3,6 @@
 #include <Arduino.h>
 
 #include "app/app.h"
-#include "ffb/ffb_effects.h"
-#include "usb/usb_wheel.h"
 
 namespace
 {
@@ -102,37 +100,6 @@ namespace
       Serial.print(calibration.clutch.min_raw);
       Serial.print(F(" CMX="));
       Serial.println(calibration.clutch.max_raw);
-      return;
-    }
-
-    if (strcmp(raw, "FSTAT") == 0)
-    {
-      const FfbDeviceState &ffb_state = ffb_get_device_state();
-      const UsbFfbRuntimeStatus &usb_status = usb_wheel_get_runtime_status();
-      const DeviceStatus &status = get_status();
-
-      Serial.print(F("FFB USB="));
-      Serial.print(usb_wheel_ready() ? 1 : 0);
-      Serial.print(F(" EN="));
-      Serial.print(ffb_state.ffb_enabled ? 1 : 0);
-      Serial.print(F(" HOST="));
-      Serial.print(ffb_state.host_connected ? 1 : 0);
-      Serial.print(F(" GAIN="));
-      Serial.print(ffb_state.device_gain);
-      Serial.print(F(" ALLOC="));
-      Serial.print(ffb_get_allocated_effect_count());
-      Serial.print(F(" ACT="));
-      Serial.print(ffb_get_active_effect_count());
-      Serial.print(F(" OUT="));
-      Serial.print(status.output);
-      Serial.print(F(" AGE="));
-      Serial.print(ffb_state.last_ffb_packet_ms == 0 ? 0 : millis() - ffb_state.last_ffb_packet_ms);
-      Serial.print(F(" UOUT="));
-      Serial.print(usb_status.output_report_count);
-      Serial.print(F(" UFEAT="));
-      Serial.print(usb_status.feature_report_count);
-      Serial.print(F(" LRID="));
-      Serial.println(usb_status.last_report_id);
       return;
     }
 

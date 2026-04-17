@@ -59,7 +59,7 @@ static void apply_default_config()
   g_config.damper = 6;
   g_config.friction = 2;
   g_config.inertia = 2;
-  g_config.spring = 0;
+  g_config.spring = 10;
   g_config.output_limit = brswdiy::protocol::OUTPUT_LIMIT_DEFAULT;
   g_config.safe_start = true;
   g_config.watchdog_ms = brswdiy::protocol::WATCHDOG_DEFAULT_MS;

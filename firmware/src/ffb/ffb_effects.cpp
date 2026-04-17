@@ -88,13 +88,40 @@ namespace
                                0x1FFFU;
 
         const uint8_t idx = phase >> 5;
+        const uint8_t prev = (idx - 1) & 0xFF;
         const uint8_t next = (idx + 1) & 0xFF;
+        const uint8_t next2 = (idx + 2) & 0xFF;
         const uint8_t frac = phase & 0x1F;
-        const int16_t sample = static_cast<int16_t>(
-            SINE_WAVE_TABLE[idx] + ((static_cast<int32_t>(SINE_WAVE_TABLE[next] - SINE_WAVE_TABLE[idx]) * frac) >> 5));
+        const int32_t p0 = SINE_WAVE_TABLE[prev];
+        const int32_t p1 = SINE_WAVE_TABLE[idx];
+        const int32_t p2 = SINE_WAVE_TABLE[next];
+        const int32_t p3 = SINE_WAVE_TABLE[next2];
+        const int32_t t = frac;
+        const int32_t t2 = t * t;
+        const int32_t t3 = t2 * t;
+        int32_t sample = (2 * p1 * 32768L) +
+                         ((-p0 + p2) * t * 1024L) +
+                         ((2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 * 32L) +
+                         ((-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+        sample >>= 16;
+        sample = constrain(sample, -127, 127);
 
-        return static_cast<int16_t>(
+        int16_t shaped = static_cast<int16_t>(
             periodic.offset + ((static_cast<int32_t>(sample) * periodic.magnitude) / 127L));
+
+        const int16_t sign = (shaped >= 0) ? 1 : -1;
+        int16_t magnitude = abs(shaped);
+        if (magnitude > 0 && magnitude <= 24)
+        {
+            magnitude = static_cast<int16_t>(magnitude + 3 + magnitude / 4);
+        }
+        else if (magnitude >= 75)
+        {
+            const int16_t excess = magnitude - 75;
+            magnitude = static_cast<int16_t>(75 + (excess * 2) / 3);
+        }
+
+        return static_cast<int16_t>(sign * constrain(magnitude, 0, 100));
     }
 
     int16_t apply_direction(const FfbEffectSlot &slot, int16_t effect_force)

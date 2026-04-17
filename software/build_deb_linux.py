@@ -10,7 +10,7 @@ from pathlib import Path
 APP_ID = 'apus'
 PACKAGE_NAME = 'apus'
 DESCRIPTION = 'BR-SWDIY wheel configuration utility'
-MAINTAINER = 'Lótus Azul <lotusazul@users.noreply.github.com>'
+MAINTAINER = 'LÃ³tus Azul <lotusazul@users.noreply.github.com>'
 SECTION = 'utils'
 PRIORITY = 'optional'
 HOMEPAGE = 'https://github.com/AdamsGt/BR-SWDIY'
